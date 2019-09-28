@@ -49,7 +49,7 @@ class GenericNetwork(nn.Module):
         # into your judgement
 class Agent(object):
     def __init__(self, actor_lr, critic_lr, input_dims, gamma = 0.99,
-                l1_size = 256, l2_size = 256, n_actions = 3):
+                l1_size = 256, l2_size = 256, n_actions = 2):
             self.gamma = gamma
             self.log_probs = None
             self.actor = GenericNetwork(actor_lr, input_dims, l1_size, l2_size, n_actions)
