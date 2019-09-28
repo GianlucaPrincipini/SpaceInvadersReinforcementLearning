@@ -5,11 +5,11 @@ import torch.optim as optim
 import numpy as np
 
 ## RETE NEURALE GENERICA
-    # lr            learning rate
-    # input_dims    dimensione di input dell'environment
-    # fc1_dims      dimensione del primo layer connesso
-    # fc2_dims      dimensione del secondo layer
-    # n_actions     numero di azioni dell'environment (output)
+    # @param lr            learning rate
+    # @param input_dims    dimensione di input dell'environment
+    # @param fc1_dims      dimensione del primo layer connesso
+    # @param fc2_dims      dimensione del secondo layer
+    # @param n_actions     numero di azioni dell'environment (output)
 class GenericNetwork(nn.Module):
     def __init__(self, lr, input_dims, fc1_dims, fc2_dims, n_actions):
         super(GenericNetwork, self).__init__()
@@ -29,24 +29,25 @@ class GenericNetwork(nn.Module):
     
     def forward(self, observation):
         # Lo stato è un cuda tensor 
-        state = T.Tensor(observation).to(self.device)
-        x = F.relu(self.fc1(state))
+        state = T.Tensor(observation).to(self.device) #prende un np array e lo trasforma in un tensore adatto alla gpu
+        x = F.relu(self.fc1(state)) #impostiamo come funzione di attivazione una relu
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
 
         return x
 
-# gamma = discount factor, 
-        # Discount factors are associated with time horizons. 
-        # Longer time horizons have have much more variance 
-        # as they include more irrelevant information, 
-        # while short time horizons are biased towards 
-        # only short-term gains.
+''' gamma = discount factor, 
+    # Discount factors are associated with time horizons. 
+    # Longer time horizons have have much more variance 
+    # as they include more irrelevant information, 
+    # while short time horizons are biased towards 
+    # only short-term gains.
 
-        #. But if your time horizon lasts for the entire month, 
-        # then every single thing that makes you feel good 
-        # or bad for the entire month will factor 
-        # into your judgement
+    #. But if your time horizon lasts for the entire month, 
+    # then every single thing that makes you feel good 
+    # or bad for the entire month will factor 
+    # into your judgement
+'''
 class Agent(object):
     def __init__(self, actor_lr, critic_lr, input_dims, gamma = 0.99,
                 l1_size = 256, l2_size = 256, n_actions = 3):
@@ -60,20 +61,24 @@ class Agent(object):
     def choose_action(self, observation):
         probabilities = F.softmax(self.actor.forward(observation))
         action_probs = T.distributions.Categorical(probabilities)
-        action = action_probs.sample()
-        self.log_probs = action_probs.log_prob(action)
+        action = action_probs.sample() #sceglie randomicamente dalla distribuzione categorica
+        self.log_probs = action_probs.log_prob(action) #calcoliamo il logaritmo della probabilità dell'azione
 
-        return action.item()
+        return action.item() #prendiamo il valore dal tensore e lorestituiamo
 
+
+    '''
+
+    '''
     def learn(self, state, reward, new_state, done):
         self.actor.optimizer.zero_grad()
         self.critic.optimizer.zero_grad() 
 
         critic_value = self.critic.forward(state)
-        critic_value_ = self.critic.forward(new_state)
+        critic_value_ = self.critic.forward(new_state) #critic  value dello stato successivo
 
 
-        delta = ((reward + self.gamma*critic_value_ * (1 - int(done))) - critic_value)
+        delta = ((reward + self.gamma*critic_value_ * (1 - int(done))) - critic_value) #delta è il vantaggio, la differenza tra il valore atteso del reward e quello effettivo
 
         actor_loss = -self.log_probs * delta
         critic_loss = delta**2
