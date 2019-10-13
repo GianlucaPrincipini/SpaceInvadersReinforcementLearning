@@ -6,7 +6,7 @@ import numpy as np
 
 class Agent(object):
     def __init__(self, alpha, beta, gamma=0.99, n_actions=4,
-                 layer1_size=1024, layer2_size=512, input_dims=8, is_ram = True):
+                 layer1_size=256, layer2_size=256, input_dims=8, is_ram = True):
         self.gamma = gamma
         self.alpha = alpha
         self.beta = beta
@@ -35,10 +35,11 @@ class Agent(object):
         values = Dense(1, activation='linear')(dense2)
 
         def custom_loss(y_true, y_pred):
-            out = K.clip(y_pred, 1e-8, 1-1e-8)
+            out = K.clip(y_pred, 1e-5, 1-1e-5)
             log_lik = y_true*K.log(out)
-
-            return K.sum(-log_lik*delta)
+            loss = K.sum(-log_lik*delta)
+            print(loss)
+            return loss
 
         actor = Model(input=[input, delta], output=[probs])
         actor.compile(optimizer=Adam(lr=self.alpha), loss=custom_loss)
@@ -53,7 +54,7 @@ class Agent(object):
         state = observation[np.newaxis, :]
         probabilities = self.policy.predict(state)[0]
         action = np.random.choice(self.action_space, p=probabilities)
-
+        # print(probabilities)
         return action
 
     def learn(self, state, action, reward, state_, done):
@@ -68,6 +69,7 @@ class Agent(object):
         actions = np.zeros([1, self.n_actions])
         actions[np.arange(1), action] = 1
 
+        # print(actions)
         self.actor.fit([state, delta], actions, verbose=0)
 
-        self.critic.fit(state, target, verbose=0)
+        self.critic.fit(state, target, verbose=1)
