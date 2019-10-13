@@ -4,17 +4,17 @@ from utils import plotLearning
 from gym import wrappers
 import numpy as np
 
-env_name = 'CartPole-v0'
+env_name = 'SpaceInvaders-v0'
 
 if __name__ == '__main__':
     env = gym.make(env_name)
     state_dimension = env.observation_space.shape
     n_actions = env.action_space.n
 
-    agent = Agent(n_actions=n_actions, input_dims = state_dimension, alpha=0.00001, beta=0.00005, gamma = 0.96, is_ram=True)
+    agent = Agent(n_actions=n_actions, input_dims = state_dimension, alpha=0.00001, beta=0.00005, gamma = 0.99, is_ram=False)
 
     score_history = []
-    num_episodes = 3
+    num_episodes = 100
 
     for i in range(num_episodes):
         done = False

@@ -26,10 +26,9 @@ class Agent(object):
         delta = Input(shape=[1])
         input_tail_network = input
         if (not self.is_ram):
-            head = Conv2D(64, kernel_size=3, activation='relu')(input)
-            conv1 = Conv2D(32, kernel_size=3, activation='relu')(head)
-            conv2 = Conv2D(16, kernel_size=3, activation='relu')(conv1)
-            input_tail_network = conv2
+            head = Conv2D(32, kernel_size=3, activation='relu')(input)
+            conv1 = Conv2D(16, kernel_size=3, activation='relu')(head)
+            input_tail_network = Flatten()(conv1)
         dense1 = Dense(self.fc1_dims, activation='relu')(input_tail_network)
         dense2 = Dense(self.fc2_dims, activation='relu')(dense1)
         probs = Dense(self.n_actions, activation='softmax')(dense2)
@@ -42,13 +41,10 @@ class Agent(object):
             return K.sum(-log_lik*delta)
 
         actor = Model(input=[input, delta], output=[probs])
-
         actor.compile(optimizer=Adam(lr=self.alpha), loss=custom_loss)
-
         critic = Model(input=[input], output=[values])
-
         critic.compile(optimizer=Adam(lr=self.beta), loss='mean_squared_error')
-
+        critic.summary()
         policy = Model(input=[input], output=[probs])
 
         return actor, critic, policy
@@ -56,11 +52,7 @@ class Agent(object):
     def choose_action(self, observation):
         state = observation[np.newaxis, :]
         probabilities = self.policy.predict(state)[0]
-        if (not self.is_ram):
-            prob = probabilities[2][1]
-        else:
-            prob = probabilities
-        action = np.random.choice(self.action_space, p=prob)
+        action = np.random.choice(self.action_space, p=probabilities)
 
         return action
 
@@ -70,7 +62,6 @@ class Agent(object):
         critic_value_ = self.critic.predict(state_)
         critic_value = self.critic.predict(state)
 
-        print(critic_value.shape)
         target = reward + self.gamma*critic_value_*(1-int(done))
         delta =  target - critic_value
 
