@@ -2,6 +2,7 @@ from keras import backend as K
 from keras.layers import Dense, Activation, Input, Conv2D, Flatten
 from keras.models import Model, load_model
 from keras.optimizers import Adam
+from keras.callbacks import ModelCheckpoint
 import numpy as np
 
 class Agent(object):
@@ -69,7 +70,13 @@ class Agent(object):
         actions = np.zeros([1, self.n_actions])
         actions[np.arange(1), action] = 1
 
+        # checkpoint
+        filepath="weights-improvement-{epoch:02d}-{val_accuracy:.2f}.hdf5"
+        checkpoint = ModelCheckpoint(filepath, monitor='val_accuracy', verbose=1, save_best_only=True, mode='max')
+
+
         # print(actions)
         self.actor.fit([state, delta], actions, verbose=0)
 
         self.critic.fit(state, target, verbose=1)
+
