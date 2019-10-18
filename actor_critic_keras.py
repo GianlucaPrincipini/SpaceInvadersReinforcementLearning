@@ -7,7 +7,9 @@ import tensorflow as tf
 import pickle
 import numpy as np
 from math import log
+import cv2
 
+stack_size = 4
 
 class Agent(object):
     def __init__(self, alpha, beta, gamma=0.99, n_actions=4,
@@ -24,10 +26,34 @@ class Agent(object):
         self.actor, self.critic, self.policy = self.build_actor_critic_network(env_name)
         self.action_space = [i for i in range(n_actions)]
 
+    # def stack_frames(stacked_frames, state, is_newEpisonde):
+    #     stack_size = 4
+    #     frame = preprocess(state)
+    #     if is_newEpisonde:
+    #         #Clear our stack
+    #         stacked_frames = deque([np.zeros((110, 84), dtype= np.int) for i in range(stack_size)], maxlen=4)
 
+    #         #since qu're in a new episode copy the same frame 4x
+    #         stacked_frames.append(frame)
+    #         stacked_frames.append(frame)
+    #         stacked_frames.append(frame)
+    #         stacked_frames.append(frame)
+
+    #         stacked_state = np.stack(stacked_frames, axis=2)
+    #     else:
+    #         stacked_frames.append(frame)
+    #         stacked_state = np.stack(stacked_frames, axis=2)
+    #     return stacked_state, stacked_frames
+
+
+    def preprocess(self, observation):
+        retObs = cv2.cvtColor(cv2.resize(observation, (84, 110)), cv2.COLOR_BGR2GRAY)
+        retObs = retObs[26:110,:]
+        ret, retObs = cv2.threshold(retObs,1,255,cv2.THRESH_BINARY)
+        return np.reshape(retObs,(84,84,1))
 
     def build_actor_critic_network(self, env_name):
-        input = Input(shape=self.input_dims)
+        input = Input(shape=(84, 84, 1))
         delta = Input(shape=[1])
         input_tail_network = input
         if (not self.is_ram):
@@ -39,7 +65,6 @@ class Agent(object):
         probs = Dense(self.n_actions, activation='softmax')(dense2)
         values = Dense(1, activation='linear')(dense2)
 
-
         actor = Model(input=[input, delta], output=[probs])
         critic = Model(input=[input], output=[values])
         critic.summary()
@@ -50,22 +75,21 @@ class Agent(object):
             with open (env_name + '_scores.dat', 'rb') as fp:
                 self.score_history = pickle.load(fp)
             
-
         self.entropy = 0
-        
 
         def custom_loss(y_true, y_pred):
             out = K.clip(y_pred, 1e-5, 1-1e-5)
             log_lik = y_true*K.log(out)
             loss = K.sum(-log_lik*delta + 0.01 * self.entropy)
             return loss
+
         actor.compile(optimizer=Adam(lr=self.alpha), loss=custom_loss)
         critic.compile(optimizer=Adam(lr=self.beta), loss='mean_squared_error')
 
         return actor, critic, policy
 
     def choose_action(self, observation):
-        state = observation[np.newaxis, :]
+        state = self.preprocess(observation)[np.newaxis, :]
         probabilities = self.policy.predict(state)[0]
         action = np.random.choice(self.action_space, p=probabilities)
         #Il clipping delle probabilità evita il logaritmo -inf
@@ -73,8 +97,8 @@ class Agent(object):
         return action
 
     def learn(self, state, action, reward, state_, done):
-        state = state[np.newaxis,:]
-        state_ = state_[np.newaxis,:]
+        state = self.preprocess(state)[np.newaxis,:]
+        state_ = self.preprocess(state_)[np.newaxis,:]
         critic_value_ = self.critic.predict(state_)
         critic_value = self.critic.predict(state)
 
