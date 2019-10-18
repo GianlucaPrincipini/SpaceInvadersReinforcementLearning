@@ -3,7 +3,7 @@ import sys
 import pylab
 import random
 import numpy as np
-from GridWorld import Env
+#from GridWorld import Env #non so a cosa serva, non riesce a importarlo
 from collections import deque
 from keras.layers import Dense, Conv2D, Reshape
 from keras.optimizers import Adam
