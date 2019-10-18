@@ -13,8 +13,8 @@ if __name__ == '__main__':
 
     agent = Agent(n_actions=n_actions, input_dims = state_dimension, alpha=0.00001, beta=0.00005, gamma = 0.99, is_ram=False)
 
-    score_history = []
-    num_episodes = 100
+    score_history = agent.score_history
+    num_episodes = 5000
 
     for i in range(num_episodes):
         done = False
@@ -26,12 +26,13 @@ if __name__ == '__main__':
             observation_, reward, done, info = env.step(action)
             agent.learn(observation, action, reward, observation_, done)
             observation = observation_
-            score += reward
+            score = score + reward
+        agent.score_history.append(score)
+        agent.save(env_name)
         env.close()
 
-        score_history.append(score)
         avg_score = np.mean(score_history[-100:])
-        print('episode: ', i,'score: %.2f' % score,
+        print('episode: ', len(agent.score_history),'score: %.2f' % score,
               'avg score %.2f' % avg_score)
 
     plotLearning(score_history, filename=env_name, window=100)
