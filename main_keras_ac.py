@@ -13,29 +13,30 @@ if __name__ == '__main__':
     env = gym.make(env_name)
     state_dimension = env.observation_space.shape
     #setto come dimensione quella del reshape
-    #state_dimension = (84,84,1)
     n_actions = env.action_space.n
 
     agent = Agent(n_actions=n_actions, input_dims = state_dimension, alpha=0.00001, beta=0.0005, gamma = 0.9)
 
     score_history = agent.score_history
-    num_episodes = 5000
+    num_episodes = 30
 
     while len(agent.score_history) < num_episodes:
         done = False
         score = 0
         observation = env.reset()
-        # self.stacked_frames = deque([np.zeros((84, 84), dtype=np.int) for i in range(stack_size)], maxlen=4)
         agent.stack_frames(observation, True)
+        #"banale" loop di interazione con gym
         while not done:
             env.render()
-            # stacked_observation, agent.stacked_frames = agent.stack_frames(observation)
-            action = agent.choose_action(observation)
+            stacked_observation, agent.stacked_frames = agent.stack_frames(observation)
+            action = agent.choose_action(stacked_observation)
             observation_, reward, done, info = env.step(action)
-            agent.learn(observation, action, reward, observation_, done)
+            agent.learn(stacked_observation, action, reward, observation_, done)
             observation = observation_
             score = score + reward
         agent.score_history.append(score)
+
+        #salvataggio dello stato dell'apprendimento ogni 10 episodi
         if ((len(agent.score_history) % 10) == 0):
             agent.save(env_name)
         env.close()

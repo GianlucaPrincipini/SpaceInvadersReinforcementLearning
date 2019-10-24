@@ -12,7 +12,6 @@ import cv2
 from collections import deque
 import matplotlib.pyplot as plt
 
-
 stack_size = 4
 
 class Agent(object):
@@ -38,7 +37,8 @@ class Agent(object):
         stacked_state = np.stack(stacked_frames, axis = 2)
         return stacked_state
             
-
+    #funzione di preprocess: rendiamo i frame monocromatici e
+    #tagliamo tutte le parti di immagine inutili all'apprendimento e normalizziamo tutti i valori a 1
     def preprocess(self, observation):
         retObs = cv2.cvtColor(cv2.resize(observation, (84, 110)), cv2.COLOR_BGR2GRAY)
         retObs = retObs[9:102,:]
@@ -47,9 +47,10 @@ class Agent(object):
         # plt.show()
         return np.reshape(retObs / 255,(93,84,1))
 
+    #creiamo uno stack di frames, tenendo traccia delle tre osservazioni precedenti ricevute
     def stack_frames(self, state, isNewEpisode = False):
         frame = self.preprocess(state)
-        if isNewEpisode:
+        if isNewEpisode: #nel caso dell'inizio di un nuovo episodio lo stack viene riempito del primo frame più volte
             #Clear our stack
             self.stacked_frames = deque([np.zeros((93, 84), dtype= np.int) for i in range(stack_size)], maxlen=stack_size)
 
@@ -61,22 +62,21 @@ class Agent(object):
 
             stacked_state = np.stack(self.stacked_frames, axis=2)
             stacked_frames = self.stacked_frames
-        else:
+        else: #se si continua un nuovo episodio, aggiungiamo il nuovo stato togliendo il vecchio
             stacked_frames = self.stacked_frames
             stacked_frames.append(frame)
-            stacked_state = np.stack(stacked_frames, axis=2)
+            stacked_state = np.stack(stacked_frames, axis=2)#???
         
-        out = np.reshape(stacked_state,(93, 84, 4))
+        out = np.reshape(stacked_state,(93, 84, 4)) #conversione in un formato elggibile alla rete
         return out, stacked_frames
 
     def build_actor_critic_network(self, env_name):
-        input = Input(shape=(93, 84, 1))
+        #creazione della struttura delle nostre due reti
+        input = Input(shape=(93, 84, 4))
         head = Conv2D(64, kernel_size=(3, 3), activation='relu')(input)
         conv1 = Conv2D(32, kernel_size=(3, 3), activation='relu')(head)
-        # input_tail_network = Flatten()(conv1)
-        drop = Dropout(0.2)
-        lstm = LSTM(200, return_sequences=True, dropout_U = 0.2, dropout_W = 0.2)(drop)
-        dense1 = Dense(self.fc1_dims, activation='relu')(lstm)
+        input_tail_network = Flatten()(conv1)
+        dense1 = Dense(self.fc1_dims, activation='relu')(input_tail_network)
         dense2 = Dense(self.fc2_dims, activation='relu')(dense1)
         probs = Dense(self.n_actions, activation='softmax')(dense2)
         values = Dense(1, activation='linear')(dense2)
@@ -91,7 +91,7 @@ class Agent(object):
             with open (env_name + '_scores.dat', 'rb') as fp:
                 self.score_history = pickle.load(fp)
             
-        self.entropy = 0
+        self.entropy = 0 
 
         def custom_entropy_loss(y_true, y_pred):
             out = K.clip(y_pred, 1e-5, 1-1e-5)
@@ -99,15 +99,14 @@ class Agent(object):
             loss = K.sum(-log_lik)
             return loss
 
-        # actor.compile(optimizer=Adam(lr=self.alpha), loss="categorical_crossentropy")
         actor.compile(optimizer=Adam(lr=self.alpha), loss=custom_entropy_loss)
         critic.compile(optimizer=Adam(lr=self.beta), loss='mean_squared_error')
 
         return actor, critic, policy
 
     def choose_action(self, stacked_observation):
-        state = self.preprocess(stacked_observation)[np.newaxis, :]
-        probabilities = self.policy.predict(state)[0]
+        state = stacked_observation[np.newaxis, :]
+        probabilities = self.policy.predict(state)[0] 
         action = np.random.choice(self.action_space, p=probabilities)
 
         # print(probabilities)
@@ -116,12 +115,10 @@ class Agent(object):
         return action
 
     def learn(self, current_stacked_state, action, reward, state_, done):
+        state = current_stacked_state[np.newaxis,:]
         target = np.zeros((1, 1))
         advantages = np.zeros((1, self.n_actions))
-        
-        state = self.preprocess(current_stacked_state)[np.newaxis,:]
-        #s_, dump = self.stack_frames(state_)
-        s_ = self.preprocess(state_)
+        s_, dump = self.stack_frames(state_)
         state_ = s_[np.newaxis,:]
 
         value = self.critic.predict(state)[0]
