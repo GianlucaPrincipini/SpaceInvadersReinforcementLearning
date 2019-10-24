@@ -44,22 +44,22 @@ class Agent(object):
         G: np.array of TD-error
         '''
         
-        states, actions, rewards, dones, next_states = batch
+        states, actions, rewards, dones, next_states, score = batch
         # Convert values to np.arrays
         rewards = np.array(rewards)
-        print(states[0].shape)
-        states = np.vstack(states)[np.newaxis, :]
-        next_states = np.vstack(next_states)[np.newaxis, :]
+        states = np.vstack(states)
+        next_states = np.vstack(next_states)
         actions = np.array(actions)
         dones = np.array(dones)
         
         total_steps = len(rewards)
         
-        print(states.shape)
-        state_values = self.critic.predict(states)
-        next_state_values = self.critic.predict(next_states)
+        state_values = self.critic.predict(states.reshape(self.n_steps, 93, 84, 1))
+        next_state_values = self.critic.predict(next_states.reshape(self.n_steps, 93, 84, 1))
         next_state_values[dones] = 0
         
+        advantages = np.zeros((self.n_steps, self.n_actions))
+
         R = np.zeros_like(rewards, dtype=np.float32)
         G = np.zeros_like(rewards, dtype=np.float32)
         
@@ -74,14 +74,17 @@ class Agent(object):
                     last_step = next_ep_completion
             
             # Sum and discount rewards
-            R[t] = sum([rewards[t + n:t + n + 1]* self.gamma **n for
+            advantages[t][actions[t]] = sum([rewards[t + n:t + n + 1] + (self.gamma **n) * next_state_values[t + n:t + n + 1] - state_values[t + n:t + n + 1] for
                         n in range(last_step)])
+            R[t] = sum([rewards[t + n:t + n + 1] * (self.gamma **n) * next_state_values[t + n : t + n + 1] for
+                        n in range(last_step)])
+
         
         if total_steps > self.n_steps:
             R[:total_steps - self.n_steps] += next_state_values[self.n_steps:]
-            
+        
         G = R - state_values
-        return R, G
+        return R, G, advantages
 
 
     #funzione di preprocess: rendiamo i frame monocromatici e
@@ -139,46 +142,14 @@ class Agent(object):
         self.entropy = - (tf.math.reduce_sum(probabilities * tf.math.log(tf.clip_by_value(probabilities,1e-5,1.0 - 1e-5))))
         return action
 
-    def learn(self, batch):
-        # state = current_stacked_state[np.newaxis,:]
-        # target = np.zeros((1, 1))
-        # advantages = np.zeros((1, self.n_actions))
-        # s_, dump = self.stack_frames(state_)
-        # state_ = s_[np.newaxis,:]
+    def learn(self, batch, env_name):
 
-        # value = self.critic.predict(state)[0]
-        # next_value = self.critic.predict(state_)[0]
-
-        # if done:
-        #     advantages[0][action] = reward - value
-        #     target[0][0] = reward
-        # else:
-        #     advantages[0][action] = reward + self.gamma * next_value - value
-        #     target[0][0] = reward + self.gamma * next_value
-
-        #advantages = np.reshape(advantages, (1, advantages.shape[0], advantages.shape[1]))
-        #print(np.reshape(advantages, (advantages.shape[1])))
-        #target = np.reshape(target, (1, target.shape[1]))
-        R, G = self.calc_rewards(batch)
-        states = np.vstack(batch[0])[np.newaxis, :]
-        self.actor.fit(states, G, epochs=1, verbose=0)
+        R, G, advantages = self.calc_rewards(batch)
+        states = np.vstack(batch[0])[np.newaxis, :].reshape(self.n_steps, 93, 84, 1)
+        self.actor.fit(states, advantages, epochs=1, verbose=0)
         self.critic.fit(states, R, epochs=1, verbose=0)
 
-        # state_ = s_[np.newaxis,:]
-        # critic_value_ = self.critic.predict(state_)
-        # critic_value = self.critic.predict(state)
 
-
-        # target = reward + self.gamma*critic_value_*(1-int(done))
-        # delta =  target - critic_value
-
-        # actions = np.zeros([1, self.n_actions])
-        # actions[np.arange(1), action] = 1
-
-        # # print(actions)
-        # self.actor.fit([state, delta], actions, verbose=0)
-
-        # self.critic.fit(state, target, verbose=0)
 
     def save(self, envName):
         self.actor.save_weights(envName + '_actor.h5')        

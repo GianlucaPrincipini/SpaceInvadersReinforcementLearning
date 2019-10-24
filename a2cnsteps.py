@@ -10,8 +10,7 @@ import cv2
 
 
 env_name = 'SpaceInvaders-v0'
-episode_counter = 0
-n_steps = 1
+n_steps = 10
 batch_size = 1
 
 def generate_episode(env, agent, state_0, score):
@@ -36,7 +35,7 @@ def generate_episode(env, agent, state_0, score):
             env.render()
             action = agent.choose_action(state_0)
             state_1, r, done, _ = env.step(action)
-            score += r
+            score = score + r
             states.append(agent.preprocess(state_0))
             next_states.append(agent.preprocess(state_1))
             actions.append(action)
@@ -46,15 +45,21 @@ def generate_episode(env, agent, state_0, score):
             
             if done:
                 agent.score_history.append(score)
+                avg_score = np.mean(agent.score_history[-100:])
+                avg_10_score = np.mean(agent.score_history[-10:])
+                print('episode: ', len(agent.score_history),'score: %.2f' % score,
+                    'avg last 100 episode score: %.2f' % avg_score, ' avg last 10 episode score: %.2f ' % avg_10_score)
                 state_0 = env.reset()
                 score = 0
-                episode_counter += 1
+                if ((len(agent.score_history) > 0) and ((len(agent.score_history) % 10) == 0)):
+                    print("Model saved")
+                    agent.save(env_name)
             
             counter += 1
             if counter >= total_count:
-                env.close()
                 break
-    return states, actions, rewards, dones, next_states
+    
+    return states, actions, rewards, dones, next_states, score
 
 
 if __name__ == '__main__':
@@ -66,22 +71,17 @@ if __name__ == '__main__':
     agent = Agent(n_actions=n_actions, input_dims = state_dimension, alpha=0.00001, beta=0.0005, gamma = 0.9)
 
     score_history = agent.score_history
-    num_episodes = 30
+    num_episodes = 5000
 
     state_0 = env.reset()
     while len(agent.score_history) < num_episodes:
         #"banale" loop di interazione con gym
         batch = generate_episode(env, agent, state_0, score)
-        agent.learn(batch)
+        score = batch[5]
+        agent.learn(batch, env_name)
 
         #salvataggio dello stato dell'apprendimento ogni 10 episodi
-        if ((len(agent.score_history) % 10) == 0):
-            agent.save(env_name)
-
-        avg_score = np.mean(score_history[-100:])
-        avg_10_score = np.mean(score_history[-10:])
-        print('episode: ', len(agent.score_history),'score: %.2f' % score,
-              'avg last 100 episode score: %.2f' % avg_score, ' avg last 10 episode score: %.2f ' % avg_10_score)
+        
     env.close()
     plotLearning(score_history, filename=env_name, window=100)
 
