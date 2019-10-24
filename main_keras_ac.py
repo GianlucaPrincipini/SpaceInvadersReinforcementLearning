@@ -29,10 +29,10 @@ if __name__ == '__main__':
         agent.stack_frames(observation, True)
         while not done:
             env.render()
-            stacked_observation, agent.stacked_frames = agent.stack_frames(observation)
-            action = agent.choose_action(stacked_observation)
+            # stacked_observation, agent.stacked_frames = agent.stack_frames(observation)
+            action = agent.choose_action(observation)
             observation_, reward, done, info = env.step(action)
-            agent.learn(stacked_observation, action, reward, observation_, done)
+            agent.learn(observation, action, reward, observation_, done)
             observation = observation_
             score = score + reward
         agent.score_history.append(score)

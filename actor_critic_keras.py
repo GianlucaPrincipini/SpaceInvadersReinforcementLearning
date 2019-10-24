@@ -1,8 +1,9 @@
 from keras import backend as K
-from keras.layers import Dense, Activation, Input, Conv2D, Flatten
+from keras.layers import Dense, Activation, Input, Conv2D, Flatten, LSTM, Dropout
 from keras.models import Model, load_model
 from keras.optimizers import Adam
 from keras.callbacks import ModelCheckpoint
+from keras.layers.wrappers import TimeDistributed
 import tensorflow as tf
 import pickle
 import numpy as np
@@ -69,11 +70,13 @@ class Agent(object):
         return out, stacked_frames
 
     def build_actor_critic_network(self, env_name):
-        input = Input(shape=(93, 84, 4))
+        input = Input(shape=(93, 84, 1))
         head = Conv2D(64, kernel_size=(3, 3), activation='relu')(input)
         conv1 = Conv2D(32, kernel_size=(3, 3), activation='relu')(head)
-        input_tail_network = Flatten()(conv1)
-        dense1 = Dense(self.fc1_dims, activation='relu')(input_tail_network)
+        # input_tail_network = Flatten()(conv1)
+        drop = Dropout(0.2)
+        lstm = LSTM(200, return_sequences=True, dropout_U = 0.2, dropout_W = 0.2)(drop)
+        dense1 = Dense(self.fc1_dims, activation='relu')(lstm)
         dense2 = Dense(self.fc2_dims, activation='relu')(dense1)
         probs = Dense(self.n_actions, activation='softmax')(dense2)
         values = Dense(1, activation='linear')(dense2)
@@ -92,8 +95,8 @@ class Agent(object):
 
         def custom_entropy_loss(y_true, y_pred):
             out = K.clip(y_pred, 1e-5, 1-1e-5)
-            log_lik = K.log(out)*y_true
-            loss = K.sum(-log_lik + 0.01 * self.entropy)
+            log_lik = K.log(out)*y_true + 0.01 * self.entropy
+            loss = K.sum(-log_lik)
             return loss
 
         # actor.compile(optimizer=Adam(lr=self.alpha), loss="categorical_crossentropy")
@@ -103,7 +106,7 @@ class Agent(object):
         return actor, critic, policy
 
     def choose_action(self, stacked_observation):
-        state = stacked_observation[np.newaxis, :]
+        state = self.preprocess(stacked_observation)[np.newaxis, :]
         probabilities = self.policy.predict(state)[0]
         action = np.random.choice(self.action_space, p=probabilities)
 
@@ -116,8 +119,9 @@ class Agent(object):
         target = np.zeros((1, 1))
         advantages = np.zeros((1, self.n_actions))
         
-        state = current_stacked_state[np.newaxis,:]
-        s_, dump = self.stack_frames(state_)
+        state = self.preprocess(current_stacked_state)[np.newaxis,:]
+        #s_, dump = self.stack_frames(state_)
+        s_ = self.preprocess(state_)
         state_ = s_[np.newaxis,:]
 
         value = self.critic.predict(state)[0]
