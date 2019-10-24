@@ -11,7 +11,6 @@ import cv2
 from collections import deque
 import matplotlib.pyplot as plt
 
-
 stack_size = 4
 
 class Agent(object):
@@ -37,7 +36,8 @@ class Agent(object):
         stacked_state = np.stack(stacked_frames, axis = 2)
         return stacked_state
             
-
+    #funzione di preprocess: rendiamo i frame monocromatici e
+    #tagliamo tutte le parti di immagine inutili all'apprendimento
     def preprocess(self, observation):
         retObs = cv2.cvtColor(cv2.resize(observation, (84, 110)), cv2.COLOR_BGR2GRAY)
         retObs = retObs[9:102,:]
@@ -46,9 +46,10 @@ class Agent(object):
         # plt.show()
         return np.reshape(retObs / 255,(93,84,1))
 
+    #creiamo uno stack di frames, tenendo traccia delle tre osservazioni precedenti ricevute
     def stack_frames(self, state, isNewEpisode = False):
         frame = self.preprocess(state)
-        if isNewEpisode:
+        if isNewEpisode: #nel caso dell'inizio di un nuovo episodio lo stack viene riempito del primo frame più volte
             #Clear our stack
             self.stacked_frames = deque([np.zeros((93, 84), dtype= np.int) for i in range(stack_size)], maxlen=stack_size)
 
@@ -60,15 +61,16 @@ class Agent(object):
 
             stacked_state = np.stack(self.stacked_frames, axis=2)
             stacked_frames = self.stacked_frames
-        else:
+        else: #se si continua un nuovo episodio, aggiungiamo il nuovo stato togliendo il vecchio
             stacked_frames = self.stacked_frames
             stacked_frames.append(frame)
-            stacked_state = np.stack(stacked_frames, axis=2)
+            stacked_state = np.stack(stacked_frames, axis=2)#???
         
-        out = np.reshape(stacked_state,(93, 84, 4))
+        out = np.reshape(stacked_state,(93, 84, 4)) #conversione in un formato elggibile alla rete
         return out, stacked_frames
 
     def build_actor_critic_network(self, env_name):
+        #creazione della struttura delle nostre due reti
         input = Input(shape=(93, 84, 4))
         head = Conv2D(64, kernel_size=(3, 3), activation='relu')(input)
         conv1 = Conv2D(32, kernel_size=(3, 3), activation='relu')(head)
@@ -80,7 +82,7 @@ class Agent(object):
 
         actor = Model(input=[input], output=[probs])
         critic = Model(input=[input], output=[values])
-        critic.summary()
+        critic.summary()                                 #??? cosa fa?
         policy = Model(input=[input], output=[probs])
         if (env_name != ''):
             actor.load_weights(env_name + '_actor.h5')        
@@ -88,7 +90,7 @@ class Agent(object):
             with open (env_name + '_scores.dat', 'rb') as fp:
                 self.score_history = pickle.load(fp)
             
-        self.entropy = 0
+        self.entropy = 0 #??? perché settata a zero?
 
         def custom_entropy_loss(y_true, y_pred):
             out = K.clip(y_pred, 1e-5, 1-1e-5)
@@ -96,7 +98,7 @@ class Agent(object):
             loss = K.sum(-log_lik + 0.01 * self.entropy)
             return loss
 
-        # actor.compile(optimizer=Adam(lr=self.alpha), loss="categorical_crossentropy")
+        # actor.compile(optimizer=Adam(lr=self.alpha), loss="categorical_crossentropy")  #Perché levarla?
         actor.compile(optimizer=Adam(lr=self.alpha), loss=custom_entropy_loss)
         critic.compile(optimizer=Adam(lr=self.beta), loss='mean_squared_error')
 
@@ -104,7 +106,7 @@ class Agent(object):
 
     def choose_action(self, stacked_observation):
         state = stacked_observation[np.newaxis, :]
-        probabilities = self.policy.predict(state)[0]
+        probabilities = self.policy.predict(state)[0] #??? il resto dello stack non lo usiamo?
         action = np.random.choice(self.action_space, p=probabilities)
 
         # print(probabilities)
