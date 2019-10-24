@@ -103,8 +103,10 @@ class Agent(object):
         input_tail_network = Flatten()(conv1)
         dense1 = Dense(self.fc1_dims, activation='relu')(input_tail_network)
         dense2 = Dense(self.fc2_dims, activation='relu')(dense1)
+        dense3 = Dense(self.fc2_dims, activation='relu')(input_tail_network)
+        dense4 = Dense(self.fc2_dims, activation='relu')(dense3)
         probs = Dense(self.n_actions, activation='softmax')(dense2)
-        values = Dense(1, activation='linear')(dense2)
+        values = Dense(1, activation='linear')(dense4)
 
 
         actor = Model(input=[input], output=[probs])
@@ -146,6 +148,7 @@ class Agent(object):
 
         R, G, advantages = self.calc_rewards(batch)
         states = np.vstack(batch[0])[np.newaxis, :].reshape(self.n_steps, 93, 84, 1)
+        advantages = K.clip(advantages, 1e-5, 1-1e-5).numpy()
         self.actor.fit(states, advantages, epochs=1, verbose=0)
         self.critic.fit(states, R, epochs=1, verbose=0)
 
