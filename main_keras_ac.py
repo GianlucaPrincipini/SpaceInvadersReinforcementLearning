@@ -9,6 +9,7 @@ import cv2
 
 env_name = 'SpaceInvaders-v0'
 
+
 if __name__ == '__main__':
     env = gym.make(env_name)
     state_dimension = env.observation_space.shape
