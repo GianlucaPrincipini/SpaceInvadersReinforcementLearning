@@ -116,8 +116,8 @@ class A2CAgent:
         advantages = np.reshape(advantages, (1, advantages.shape[0], advantages.shape[1]))
         target = np.reshape(target, (1, target.shape[0], target.shape[1]))
 
-        self.actor.fit(state, advantages, epochs=1, verbose=0)
-        self.critic.fit(state, target, epochs=1, verbose=0)
+        self.actor.fit(state, advantages, epochs=1, verbose=1)
+        self.critic.fit(state, target, epochs=1, verbose=1)
 
     # load the saved model
     def load_model(self):
