@@ -9,7 +9,7 @@ import numpy as np
 import cv2
 
 
-env_name = 'SpaceInvaders-v0'
+env_name = 'Breakout-v0'
 n_steps = 10
 batch_size = 1
 
@@ -25,7 +25,7 @@ def generate_episode(env, agent, state_0, score):
     next_states: list of arrays of states
     '''
     
-    states, actions, rewards, dones, next_states = [], [], [], [], []
+    states, actions, rewards, dones, next_states, lives = [], [], [], [], [], []
     counter = 0
     total_count = batch_size * n_steps
     
@@ -34,7 +34,8 @@ def generate_episode(env, agent, state_0, score):
         while done == False:
             env.render()
             action = agent.choose_action(state_0)
-            state_1, r, done, _ = env.step(action)
+            state_1, r, done, info = env.step(action)
+            lives.append(info['ale.lives'])
             score = score + r
             states.append(agent.preprocess(state_0))
             next_states.append(agent.preprocess(state_1))
@@ -59,7 +60,7 @@ def generate_episode(env, agent, state_0, score):
             if counter >= total_count:
                 break
     
-    return states, actions, rewards, dones, next_states, score
+    return states, actions, rewards, dones, next_states, score, lives
 
 
 if __name__ == '__main__':
@@ -68,10 +69,10 @@ if __name__ == '__main__':
     #setto come dimensione quella del reshape
     n_actions = env.action_space.n
     score = 0
-    agent = Agent(n_actions=n_actions, input_dims = state_dimension, alpha=0.00001, beta=0.00005, gamma = 0.99, n_steps=n_steps)
+    agent = Agent(n_actions=n_actions, input_dims = state_dimension, alpha=0.00001, beta=0.00003, gamma = 0.99, env_name=env_name)
 
     score_history = agent.score_history
-    num_episodes = 5000
+    num_episodes = 7000
 
     state_0 = env.reset()
     while len(agent.score_history) < num_episodes:
