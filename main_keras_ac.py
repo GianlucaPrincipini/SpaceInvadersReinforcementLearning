@@ -1,5 +1,5 @@
 import gym, os
-from actor_critic_keras import Agent
+from recurrent_a2c import Agent
 from utils import plotLearning
 from gym import wrappers
 from collections import deque
