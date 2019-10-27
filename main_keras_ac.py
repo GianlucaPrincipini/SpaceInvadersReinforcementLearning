@@ -1,5 +1,5 @@
 import gym, os
-from recurrent_a2c import Agent
+from actor_critic_keras import Agent
 from utils import plotLearning
 from gym import wrappers
 from collections import deque
@@ -16,10 +16,10 @@ if __name__ == '__main__':
     #setto come dimensione quella del reshape
     n_actions = env.action_space.n
 
-    agent = Agent(n_actions=n_actions, input_dims = state_dimension, alpha=0.00001, beta=0.0005, gamma = 0.9)
+    agent = Agent(n_actions=n_actions, input_dims = state_dimension, alpha=0.00001, beta=0.00005, gamma = 0.99)
 
     score_history = agent.score_history
-    num_episodes = 30
+    num_episodes = 1000
 
     while len(agent.score_history) < num_episodes:
         done = False
@@ -40,12 +40,12 @@ if __name__ == '__main__':
         #salvataggio dello stato dell'apprendimento ogni 10 episodi
         if ((len(agent.score_history) % 10) == 0):
             agent.save(env_name)
-        env.close()
 
         avg_score = np.mean(score_history[-100:])
         avg_10_score = np.mean(score_history[-10:])
         print('episode: ', len(agent.score_history),'score: %.2f' % score,
               'avg last 100 episode score: %.2f' % avg_score, ' avg last 10 episode score: %.2f ' % avg_10_score)
 
+    env.close()
     plotLearning(score_history, filename=env_name, window=100)
 

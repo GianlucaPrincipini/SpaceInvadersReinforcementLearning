@@ -71,9 +71,8 @@ class Agent(object):
     def build_actor_critic_network(self, env_name):
         #creazione della struttura delle nostre due reti
         input = Input(shape=(stack_size, 93, 84, 1)) #input shape must be(samples,time, rows, cols, channels)
-        head = ConvLSTM2D(64, kernel_size=(3, 3), activation='relu', return_sequences=True)(input)
-        print(head)
-        conv1 = ConvLSTM2D(32, kernel_size=(3, 3), activation='relu')(head)
+        head = Conv2D(64, kernel_size=(3, 3), activation='relu', return_sequences=True)(input)
+        conv1 = Conv2D(32, kernel_size=(3, 3), activation='relu')(head)
         input_tail_network = Flatten()(conv1)
         dense1 = Dense(self.fc1_dims, activation='relu')(input_tail_network)
         dense2 = Dense(self.fc2_dims, activation='relu')(dense1)

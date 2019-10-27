@@ -10,7 +10,7 @@ import cv2
 
 
 env_name = 'Breakout-v0'
-n_steps = 10
+n_steps = 4
 batch_size = 1
 
 def generate_episode(env, agent, state_0, score):

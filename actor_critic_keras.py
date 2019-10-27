@@ -5,6 +5,7 @@ from keras.optimizers import Adam
 from keras.callbacks import ModelCheckpoint
 from keras.layers.wrappers import TimeDistributed
 import tensorflow as tf
+import sys
 import pickle
 import numpy as np
 from math import log
@@ -16,7 +17,7 @@ stack_size = 4
 
 class Agent(object):
     def __init__(self, alpha, beta, gamma=0.99, n_actions=4,
-                 layer1_size=256, layer2_size=256, input_dims=8, env_name = ''):
+                 layer1_size=1024, layer2_size=512, input_dims=8, env_name = ''):
         self.gamma = gamma
         self.alpha = alpha
         self.beta = beta
@@ -28,6 +29,9 @@ class Agent(object):
         self.stacked_frames = deque([np.zeros((76, 84), dtype=np.int) for i in range(stack_size)], maxlen=4)
         self.actor, self.critic, self.policy = self.build_actor_critic_network(env_name)
         self.action_space = [i for i in range(n_actions)]
+
+    def getEntropia():
+        return self.entropy
 
     def initialize_stacked_frames(self, initial_frame):
         frame = self.preprocess(initial_frame)
@@ -71,35 +75,36 @@ class Agent(object):
         return out, stacked_frames
 
     def build_actor_critic_network(self, env_name):
+        # input_tail_network = Input(shape=self.input_dims)
         #creazione della struttura delle nostre due reti
+        entropia = Input(shape = [1])
+        delta = Input(shape = [1])
         input = Input(shape=(93, 84, 4))
-        head = Conv2D(64, kernel_size=(3, 3), activation='relu')(input)
-        conv1 = Conv2D(32, kernel_size=(3, 3), activation='relu')(head)
+        head = Conv2D(16, kernel_size=(3, 3), activation='relu')(input)
+        conv1 = Conv2D(16, kernel_size=(3, 3), activation='relu')(head)
         input_tail_network = Flatten()(conv1)
         dense1 = Dense(self.fc1_dims, activation='relu')(input_tail_network)
         dense2 = Dense(self.fc2_dims, activation='relu')(dense1)
         probs = Dense(self.n_actions, activation='softmax')(dense2)
         values = Dense(1, activation='linear')(dense2)
 
-        actor = Model(input=[input], output=[probs])
+        actor = Model(input=[input, entropia, delta], output=[probs])
         critic = Model(input=[input], output=[values])
-        critic.summary()
+        actor.summary()
         policy = Model(input=[input], output=[probs])
+
         if (env_name != ''):
             actor.load_weights(env_name + '_actor.h5')        
             critic.load_weights(env_name + '_critic.h5')
             with open (env_name + '_scores.dat', 'rb') as fp:
                 self.score_history = pickle.load(fp)
             
-        self.entropy = 0 
-
-        def custom_entropy_loss(y_true, y_pred):
+        def custom_loss(y_true, y_pred):
             out = K.clip(y_pred, 1e-5, 1-1e-5)
-            log_lik = K.log(out)*y_true + 0.01 * self.entropy
-            loss = K.sum(-log_lik)
-            return loss
-
-        actor.compile(optimizer=Adam(lr=self.alpha), loss=custom_entropy_loss)
+            log_lik = y_true*K.log(out) + 0.1 * entropia
+            return K.sum(-log_lik*delta)
+    
+        actor.compile(optimizer=Adam(lr=self.alpha), loss=custom_loss)
         critic.compile(optimizer=Adam(lr=self.beta), loss='mean_squared_error')
 
         return actor, critic, policy
@@ -116,43 +121,31 @@ class Agent(object):
 
     def learn(self, current_stacked_state, action, reward, state_, done):
         state = current_stacked_state[np.newaxis,:]
+        #state_ = state_[np.newaxis,:]
+
         target = np.zeros((1, 1))
         advantages = np.zeros((1, self.n_actions))
         s_, dump = self.stack_frames(state_)
         state_ = s_[np.newaxis,:]
 
+
         value = self.critic.predict(state)[0]
         next_value = self.critic.predict(state_)[0]
 
         if done:
-            advantages[0][action] = reward - value
-            target[0][0] = reward
+            target = reward
         else:
-            advantages[0][action] = reward + self.gamma * next_value - value
-            target[0][0] = reward + self.gamma * next_value
+            target = reward + self.gamma * next_value
+        
+        advantage = target - value
+        actions = np.zeros([1, self.n_actions])
+        actions[np.arange(1), action] = 1
 
-        #advantages = np.reshape(advantages, (1, advantages.shape[0], advantages.shape[1]))
-        #print(np.reshape(advantages, (advantages.shape[1])))
-        target = np.reshape(target, (1, target.shape[1]))
+        #target = np.reshape(target, (1, target.shape[1]))
 
-        self.actor.fit(state, advantages, epochs=1, verbose=0)
+
+        self.actor.fit([state, np.reshape(self.entropy, (1, 1)), advantage], actions, epochs=1, verbose=1)
         self.critic.fit(state, target, epochs=1, verbose=0)
-
-        # state_ = s_[np.newaxis,:]
-        # critic_value_ = self.critic.predict(state_)
-        # critic_value = self.critic.predict(state)
-
-
-        # target = reward + self.gamma*critic_value_*(1-int(done))
-        # delta =  target - critic_value
-
-        # actions = np.zeros([1, self.n_actions])
-        # actions[np.arange(1), action] = 1
-
-        # # print(actions)
-        # self.actor.fit([state, delta], actions, verbose=0)
-
-        # self.critic.fit(state, target, verbose=0)
 
     def save(self, envName):
         self.actor.save_weights(envName + '_actor.h5')        
