@@ -75,7 +75,6 @@ class Agent(object):
         return out, stacked_frames
 
     def build_actor_critic_network(self, env_name):
-        # input_tail_network = Input(shape=self.input_dims)
         #creazione della struttura delle nostre due reti
         entropia = Input(shape = [1])
         delta = Input(shape = [1])
@@ -83,6 +82,8 @@ class Agent(object):
         head = Conv2D(16, kernel_size=(3, 3), activation='relu')(input)
         conv1 = Conv2D(16, kernel_size=(3, 3), activation='relu')(head)
         input_tail_network = Flatten()(conv1)
+        # input_tail_network = Input(shape=self.input_dims)
+        # input = input_tail_network
         dense1 = Dense(self.fc1_dims, activation='relu')(input_tail_network)
         dense2 = Dense(self.fc2_dims, activation='relu')(dense1)
         probs = Dense(self.n_actions, activation='softmax')(dense2)
@@ -101,7 +102,7 @@ class Agent(object):
             
         def custom_loss(y_true, y_pred):
             out = K.clip(y_pred, 1e-5, 1-1e-5)
-            log_lik = y_true*K.log(out) + 0.1 * entropia
+            log_lik = y_true*K.log(out) + 0 * entropia
             return K.sum(-log_lik*delta)
     
         actor.compile(optimizer=Adam(lr=self.alpha), loss=custom_loss)
@@ -121,30 +122,28 @@ class Agent(object):
 
     def learn(self, current_stacked_state, action, reward, state_, done):
         state = current_stacked_state[np.newaxis,:]
-        #state_ = state_[np.newaxis,:]
 
-        target = np.zeros((1, 1))
-        advantages = np.zeros((1, self.n_actions))
         s_, dump = self.stack_frames(state_)
         state_ = s_[np.newaxis,:]
+        # state_ = state_[np.newaxis,:]
 
 
         value = self.critic.predict(state)[0]
         next_value = self.critic.predict(state_)[0]
 
         if done:
-            target = reward
+            target = reward + self.gamma * next_value * 0
         else:
             target = reward + self.gamma * next_value
         
         advantage = target - value
         actions = np.zeros([1, self.n_actions])
         actions[np.arange(1), action] = 1
+        # print(target.shape)
+        # target = np.reshape(target, (1, target.shape[1]))
 
-        #target = np.reshape(target, (1, target.shape[1]))
 
-
-        self.actor.fit([state, np.reshape(self.entropy, (1, 1)), advantage], actions, epochs=1, verbose=1)
+        self.actor.fit([state, np.reshape(self.entropy, (1, 1)), advantage], actions, epochs=1, verbose = 0)
         self.critic.fit(state, target, epochs=1, verbose=0)
 
     def save(self, envName):

@@ -16,7 +16,7 @@ if __name__ == '__main__':
     #setto come dimensione quella del reshape
     n_actions = env.action_space.n
 
-    agent = Agent(n_actions=n_actions, input_dims = state_dimension, alpha=0.00001, beta=0.00005, gamma = 0.99)
+    agent = Agent(n_actions=n_actions, input_dims = state_dimension, alpha=0.00001, beta=0.00005, gamma = 0.99, env_name=env_name)
 
     score_history = agent.score_history
     num_episodes = 1000
