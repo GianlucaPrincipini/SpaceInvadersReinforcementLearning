@@ -1,6 +1,7 @@
 from keras import backend as K
 from keras.layers import Dense, Activation, Input, Conv2D, Flatten, LSTM, Dropout
 from keras.models import Model, load_model
+from keras.initializers import Orthogonal
 from keras.optimizers import Adam
 from keras.callbacks import ModelCheckpoint
 from keras.layers.wrappers import TimeDistributed
@@ -17,7 +18,7 @@ stack_size = 4
 
 class Agent(object):
     def __init__(self, alpha, beta, gamma=0.99, n_actions=4,
-                 layer1_size=1024, layer2_size=512, input_dims=8, env_name = ''):
+                 layer1_size=2048, layer2_size=2048, input_dims=8, env_name = ''):
         self.gamma = gamma
         self.alpha = alpha
         self.beta = beta
@@ -67,7 +68,7 @@ class Agent(object):
             stacked_state = np.stack(self.stacked_frames, axis=2)
             stacked_frames = self.stacked_frames
         else: #se si continua un nuovo episodio, aggiungiamo il nuovo stato togliendo il vecchio
-            stacked_frames = self.stacked_frames
+            stacked_frames = self.stacked_frames.copy()
             stacked_frames.append(frame)
             stacked_state = np.stack(stacked_frames, axis=2)#???
         
@@ -77,19 +78,22 @@ class Agent(object):
     def build_actor_critic_network(self, env_name):
         #creazione della struttura delle nostre due reti
         entropia = Input(shape = [1])
-        delta = Input(shape = [1])
+        advantage = Input(shape = [1])
         input = Input(shape=(93, 84, 4))
-        head = Conv2D(16, kernel_size=(3, 3), activation='relu')(input)
-        conv1 = Conv2D(16, kernel_size=(3, 3), activation='relu')(head)
-        input_tail_network = Flatten()(conv1)
+        head = Conv2D(32, kernel_size=(8, 8), strides=2, activation='relu', kernel_initializer=Orthogonal(np.sqrt(2)))(input)
+        conv1 = Conv2D(64, kernel_size=(4, 4), strides=2, activation='relu', kernel_initializer=Orthogonal(np.sqrt(2)))(head)
+        conv2 = Conv2D(64, kernel_size=(3, 3), strides=2, activation='relu', kernel_initializer=Orthogonal(np.sqrt(2)))(conv1)
+        input_tail_network = Flatten()(conv2)
         # input_tail_network = Input(shape=self.input_dims)
         # input = input_tail_network
-        dense1 = Dense(self.fc1_dims, activation='relu')(input_tail_network)
-        dense2 = Dense(self.fc2_dims, activation='relu')(dense1)
-        probs = Dense(self.n_actions, activation='softmax')(dense2)
-        values = Dense(1, activation='linear')(dense2)
+        dense_actor_1 = Dense(self.fc1_dims, activation='relu', kernel_initializer=Orthogonal(np.sqrt(2)))(input_tail_network)
+        dense_actor_2 = Dense(self.fc1_dims, activation='relu', kernel_initializer=Orthogonal(np.sqrt(2)))(dense_actor_1)
+        dense_critic_1 = Dense(self.fc2_dims, activation='relu', kernel_initializer=Orthogonal(np.sqrt(2)))(input_tail_network)
+        dense_critic_2 = Dense(self.fc2_dims, activation='relu', kernel_initializer=Orthogonal(np.sqrt(2)))(dense_critic_1)
+        probs = Dense(self.n_actions, activation='softmax')(dense_actor_2)
+        values = Dense(1, activation='linear')(dense_critic_2)
 
-        actor = Model(input=[input, entropia, delta], output=[probs])
+        actor = Model(input=[input, entropia, advantage], output=[probs])
         critic = Model(input=[input], output=[values])
         actor.summary()
         policy = Model(input=[input], output=[probs])
@@ -101,9 +105,9 @@ class Agent(object):
                 self.score_history = pickle.load(fp)
             
         def custom_loss(y_true, y_pred):
-            out = K.clip(y_pred, 1e-5, 1-1e-5)
-            log_lik = y_true*K.log(out) + 0 * entropia
-            return K.sum(-log_lik*delta)
+            out = K.clip(y_pred, 1e-8, 1-1e-8)
+            log_lik = y_true*K.log(out) + 0.05 * entropia
+            return K.sum(-log_lik*advantage)
     
         actor.compile(optimizer=Adam(lr=self.alpha), loss=custom_loss)
         critic.compile(optimizer=Adam(lr=self.beta), loss='mean_squared_error')
@@ -117,7 +121,7 @@ class Agent(object):
 
         # print(probabilities)
         #Il clipping delle probabilità evita il logaritmo -inf
-        self.entropy = - (tf.math.reduce_sum(probabilities * tf.math.log(tf.clip_by_value(probabilities,1e-5,1.0 - 1e-5))))
+        self.entropy = - (tf.math.reduce_sum(probabilities * tf.math.log(tf.clip_by_value(probabilities,1e-8,1.0 - 1e-8))))
         return action
 
     def learn(self, current_stacked_state, action, reward, state_, done):
@@ -137,13 +141,14 @@ class Agent(object):
             target = reward + self.gamma * next_value
         
         advantage = target - value
+        # print(advantage)
         actions = np.zeros([1, self.n_actions])
         actions[np.arange(1), action] = 1
         # print(target.shape)
         # target = np.reshape(target, (1, target.shape[1]))
 
 
-        self.actor.fit([state, np.reshape(self.entropy, (1, 1)), advantage], actions, epochs=1, verbose = 0)
+        self.actor.fit([state, np.reshape(self.entropy, (1, 1)), advantage], actions, epochs=1, verbose=0)
         self.critic.fit(state, target, epochs=1, verbose=0)
 
     def save(self, envName):

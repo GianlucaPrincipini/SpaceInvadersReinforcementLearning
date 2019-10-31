@@ -7,7 +7,7 @@ import numpy as np
 import cv2
 
 
-env_name = 'SpaceInvaders-v0'
+env_name = 'SpaceInvaders-v4'
 
 
 if __name__ == '__main__':
@@ -16,25 +16,29 @@ if __name__ == '__main__':
     #setto come dimensione quella del reshape
     n_actions = env.action_space.n
 
-    agent = Agent(n_actions=n_actions, input_dims = state_dimension, alpha=0.00001, beta=0.00005, gamma = 0.99, env_name=env_name)
+    agent = Agent(n_actions=n_actions, input_dims = state_dimension, alpha=0.00001, beta=0.00003, gamma = 0.99)
 
     score_history = agent.score_history
-    num_episodes = 1000
+    num_episodes = 5000
 
     while len(agent.score_history) < num_episodes:
         done = False
         score = 0
         observation = env.reset()
         agent.stack_frames(observation, True)
+        lives = 3
         #"banale" loop di interazione con gym
         while not done:
             env.render()
             stacked_observation, agent.stacked_frames = agent.stack_frames(observation)
             action = agent.choose_action(stacked_observation)
             observation_, reward, done, info = env.step(action)
+            score = score + reward
+            if (info['ale.lives'] < lives):
+               lives = info['ale.lives']
+               reward = reward - 10
             agent.learn(stacked_observation, action, reward, observation_, done)
             observation = observation_
-            score = score + reward
         agent.score_history.append(score)
 
         #salvataggio dello stato dell'apprendimento ogni 10 episodi
