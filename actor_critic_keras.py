@@ -14,34 +14,26 @@ import cv2
 from collections import deque
 import matplotlib.pyplot as plt
 
-stack_size = 4
 
 class Agent(object):
-    def __init__(self, alpha, beta, gamma=0.99, n_actions=4,
-                 layer1_size=2048, layer2_size=2048, input_dims=8, env_name = ''):
-        self.gamma = gamma
-        self.alpha = alpha
-        self.beta = beta
+    def __init__(self, actor_lr, critic_lr, stack_size = 4, discount_factor=0.99, n_actions=4,
+                 layer1_size=1024, layer2_size=1024, input_dims=8, entropy_coefficient = 0.01, env_name = ''):
+        self.discount_factor = discount_factor
+        self.stack_size = stack_size
+        self.actor_lr = actor_lr
+        self.critic_lr = critic_lr
         self.input_dims = input_dims
+        self.entropy_coefficient = entropy_coefficient
         self.fc1_dims = layer1_size
         self.fc2_dims = layer2_size
         self.n_actions = n_actions
         self.score_history = []
-        self.stacked_frames = deque([np.zeros((76, 84), dtype=np.int) for i in range(stack_size)], maxlen=4)
         self.actor, self.critic, self.policy = self.build_actor_critic_network(env_name)
         self.action_space = [i for i in range(n_actions)]
 
     def getEntropia():
         return self.entropy
 
-    def initialize_stacked_frames(self, initial_frame):
-        frame = self.preprocess(initial_frame)
-        for i in range(stack_size):
-            stacked_frames.append(frame)
-        
-        stacked_state = np.stack(stacked_frames, axis = 2)
-        return stacked_state
-            
     #funzione di preprocess: rendiamo i frame monocromatici e
     #tagliamo tutte le parti di immagine inutili all'apprendimento e normalizziamo tutti i valori a 1
     def preprocess(self, observation):
@@ -52,44 +44,21 @@ class Agent(object):
         # plt.show()
         return np.reshape(retObs / 255,(93,84,1))
 
-    #creiamo uno stack di frames, tenendo traccia delle tre osservazioni precedenti ricevute
-    def stack_frames(self, state, isNewEpisode = False):
-        frame = self.preprocess(state)
-        if isNewEpisode: #nel caso dell'inizio di un nuovo episodio lo stack viene riempito del primo frame più volte
-            #Clear our stack
-            self.stacked_frames = deque([np.zeros((93, 84), dtype= np.int) for i in range(stack_size)], maxlen=stack_size)
-
-            #since qu're in a new episode copy the same frame 4x
-            self.stacked_frames.append(frame)
-            self.stacked_frames.append(frame)
-            self.stacked_frames.append(frame)
-            self.stacked_frames.append(frame)
-
-            stacked_state = np.stack(self.stacked_frames, axis=2)
-            stacked_frames = self.stacked_frames
-        else: #se si continua un nuovo episodio, aggiungiamo il nuovo stato togliendo il vecchio
-            stacked_frames = self.stacked_frames.copy()
-            stacked_frames.append(frame)
-            stacked_state = np.stack(stacked_frames, axis=2)#???
-        
-        out = np.reshape(stacked_state,(93, 84, 4)) #conversione in un formato elggibile alla rete
-        return out, stacked_frames
-
     def build_actor_critic_network(self, env_name):
         #creazione della struttura delle nostre due reti
         entropia = Input(shape = [1])
         advantage = Input(shape = [1])
-        input = Input(shape=(93, 84, 4))
-        head = Conv2D(32, kernel_size=(8, 8), strides=2, activation='relu', kernel_initializer=Orthogonal(np.sqrt(2)))(input)
+        input = Input(shape=(93, 84, self.stack_size))
+        head =  Conv2D(32, kernel_size=(8, 8), strides=2, activation='relu', kernel_initializer=Orthogonal(np.sqrt(2)))(input)
         conv1 = Conv2D(64, kernel_size=(4, 4), strides=2, activation='relu', kernel_initializer=Orthogonal(np.sqrt(2)))(head)
         conv2 = Conv2D(64, kernel_size=(3, 3), strides=2, activation='relu', kernel_initializer=Orthogonal(np.sqrt(2)))(conv1)
         input_tail_network = Flatten()(conv2)
         # input_tail_network = Input(shape=self.input_dims)
         # input = input_tail_network
-        dense_actor_1 = Dense(self.fc1_dims, activation='relu', kernel_initializer=Orthogonal(np.sqrt(2)))(input_tail_network)
-        dense_actor_2 = Dense(self.fc1_dims, activation='relu', kernel_initializer=Orthogonal(np.sqrt(2)))(dense_actor_1)
-        dense_critic_1 = Dense(self.fc2_dims, activation='relu', kernel_initializer=Orthogonal(np.sqrt(2)))(input_tail_network)
-        dense_critic_2 = Dense(self.fc2_dims, activation='relu', kernel_initializer=Orthogonal(np.sqrt(2)))(dense_critic_1)
+        dense_actor_1 =     Dense(self.fc1_dims, activation='relu', kernel_initializer=Orthogonal(np.sqrt(2)))(input_tail_network)
+        dense_actor_2 =     Dense(self.fc1_dims, activation='relu', kernel_initializer=Orthogonal(np.sqrt(2)))(dense_actor_1)
+        dense_critic_1 =    Dense(self.fc2_dims, activation='relu', kernel_initializer=Orthogonal(np.sqrt(2)))(input_tail_network)
+        dense_critic_2 =    Dense(self.fc2_dims, activation='relu', kernel_initializer=Orthogonal(np.sqrt(2)))(dense_critic_1)
         probs = Dense(self.n_actions, activation='softmax')(dense_actor_2)
         values = Dense(1, activation='linear')(dense_critic_2)
 
@@ -106,11 +75,11 @@ class Agent(object):
             
         def custom_loss(y_true, y_pred):
             out = K.clip(y_pred, 1e-8, 1-1e-8)
-            log_lik = y_true*K.log(out) + 0.05 * entropia
+            log_lik = y_true*K.log(out) + self.entropy_coefficient * entropia
             return K.sum(-log_lik*advantage)
     
-        actor.compile(optimizer=Adam(lr=self.alpha), loss=custom_loss)
-        critic.compile(optimizer=Adam(lr=self.beta), loss='mean_squared_error')
+        actor.compile(optimizer=Adam(lr=self.actor_lr), loss=custom_loss)
+        critic.compile(optimizer=Adam(lr=self.critic_lr), loss='mean_squared_error')
 
         return actor, critic, policy
 
@@ -127,18 +96,20 @@ class Agent(object):
     def learn(self, current_stacked_state, action, reward, state_, done):
         state = current_stacked_state[np.newaxis,:]
 
-        s_, dump = self.stack_frames(state_)
-        state_ = s_[np.newaxis,:]
+        # s_, dump = self.stack_frames(state_)
+        state_ = state_[np.newaxis,:]
         # state_ = state_[np.newaxis,:]
 
 
         value = self.critic.predict(state)[0]
         next_value = self.critic.predict(state_)[0]
+        # print('Val: %2.3f', value)
+        # print('NextVal: %2.3f', next_value)
 
         if done:
-            target = reward + self.gamma * next_value * 0
+            target = reward + self.discount_factor * next_value * 0
         else:
-            target = reward + self.gamma * next_value
+            target = reward + self.discount_factor * next_value
         
         advantage = target - value
         # print(advantage)
