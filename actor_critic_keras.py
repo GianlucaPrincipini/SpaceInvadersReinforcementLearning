@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 
 class Agent(object):
     def __init__(self, actor_lr, critic_lr, stack_size = 4, discount_factor=0.99, n_actions=4,
-                 layer1_size=1024, layer2_size=1024, input_dims=8, entropy_coefficient = 0.01, env_name = ''):
+                 layer1_size=128, layer2_size=128, input_dims=8, entropy_coefficient = 0.01, env_name = ''):
         self.discount_factor = discount_factor
         self.stack_size = stack_size
         self.actor_lr = actor_lr

@@ -21,7 +21,7 @@ if __name__ == '__main__':
     agent = Agent(n_actions=n_actions, 
         input_dims = state_dimension, 
         stack_size = stack_size, 
-        actor_lr=0.00001, 
+        actor_lr=0.0001, 
         critic_lr=0.0001, 
         discount_factor = 0.99, 
         entropy_coefficient=0.01, 

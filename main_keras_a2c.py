@@ -10,10 +10,10 @@ import atari_wrappers as aw
 
 env_name = 'SpaceInvaders-v4'
 
-stack_size = 4
+stack_size = 8
 
 if __name__ == '__main__':
-    #env = aw.FrameStack(aw.NoopResetEnv(aw.ClipRewardEnv(gym.make(env_name)), 35), stack_size)
+    # env = aw.FrameStack(aw.NoopResetEnv(aw.ClipRewardEnv(gym.make(env_name)), 35), stack_size)
     env_name = 'CartPole-v0'
     env = gym.make(env_name)
     state_dimension = env.observation_space.shape
@@ -24,46 +24,46 @@ if __name__ == '__main__':
         input_dims = state_dimension, 
         stack_size = stack_size, 
         actor_lr=0.00001, 
-        critic_lr=0.00001, 
-        discount_factor = 1, 
-        entropy_coefficient=0, 
+        critic_lr=0.00005, 
+        discount_factor = 0.99, 
+        entropy_coefficient=0.01, 
         state = env.reset()[np.newaxis, :],
         # env_name = env_name
     )
 
     score_history = agent.score_history
-    num_episodes = 3200
+    num_episodes = 5000
 
     while len(agent.score_history) < num_episodes:
         done = False
         score = 0
-        step_number = 0
         observation = env.reset()
         observation = observation[np.newaxis, :]
         agent.reset_memory()
         #"banale" loop di interazione con gym
+        step_number = 0
         while not done:
             agent.choose_action(observation)
             env.render()
             action = agent.choose_action(observation)
-            # print(action[0])
-            observation_, reward, done, info = env.step(action[0])
+            observation_, reward, done, info = env.step(action)
             observation_ = observation_[np.newaxis, :]
 
             step = [step_number, observation, observation_, reward, done]
             agent.remember(step)
-
+            step_number = step_number + 1
             score = score + reward
-            # agent.learn(observation, action, reward, observation_, done)
             observation = observation_
-
+            
             if done:
                 # for REINFORCE, REINFORCE with baseline, and A2C
                 # we wait for the completion of the episode before 
                 # training the network(s)
                 # last value as used by A2C
-                v = 0 
+                v = 0 if reward > 0 else agent.get_value(observation_)[0]
                 agent.train_by_episode(last_value=v)
+
+            
         agent.score_history.append(score)
 
         #salvataggio dello stato dell'apprendimento ogni 10 episodi
