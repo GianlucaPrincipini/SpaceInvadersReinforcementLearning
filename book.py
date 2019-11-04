@@ -168,13 +168,6 @@ class PolicyAgent():
 
         return loss
 
-
-    # typical loss function structure that accepts 2 arguments only
-    # this will be used by value loss of all methods except A2C
-    def value_loss(self, y_true, y_pred):
-        return -K.mean(y_pred * y_true, axis=-1)
-
-
     # save the actor, critic and encoder weights
     # useful for restoring the trained models
     def save_weights(self, actor_weights, encoder_weights, value_weights=None):
