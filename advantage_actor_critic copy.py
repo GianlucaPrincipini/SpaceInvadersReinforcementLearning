@@ -25,7 +25,8 @@ class Agent(object):
         # s,a,r,s' are stored in memory
         self.memory = []
         self.state = state
-
+        self.actor_losses = []
+        self.critic_losses = []
         self.discount_factor = discount_factor
         self.stack_size = stack_size
         self.actor_lr = actor_lr
@@ -62,6 +63,7 @@ class Agent(object):
         probabilities, action = args
         probabilities = tf.clip_by_value(probabilities,1e-5,1.0 - 1e-5)
         # probabilities = K.print_tensor(probabilities)
+        # action = K.print_tensor(action)
         dist = tfp.distributions.Categorical(probs = probabilities)
         logp = dist.log_prob(action)
         return logp
@@ -128,7 +130,7 @@ class Agent(object):
         ### CRITIC ###
         dense_critic_1 =    Dense(self.fc1_dims, activation='relu', kernel_initializer=glorot_normal())(input_tail_network)
         dense_critic_2 =     Dense(self.fc2_dims, activation='relu', kernel_initializer=glorot_normal())(dense_critic_1)
-        values = Dense(1, activation='linear')(dense_critic_2)
+        values = Dense(1, activation='linear', kernel_initializer='zero')(dense_critic_2)
         self.critic = Model(input, values)
         self.critic.compile(optimizer=Adam(lr=self.critic_lr), loss='mean_squared_error')
         plot_model(self.critic, to_file='critic.png', show_shapes=True)
@@ -161,27 +163,34 @@ class Agent(object):
         # 10.2.1, 10.3.1 and 10.4.1
         discounted_delta = delta * discount_factor
         discounted_delta = np.reshape(discounted_delta, [-1, 1])
-        verbose = 1 if done else 0
-        # verbose = 0
+        # verbose = 1 if done else 0
+        verbose = 0
+
+        # print(state.shape)
 
         # train the logp model (implies training of actor model
         # as well) since they share exactly the same set of
         # # parameters
-        self.logp_model.fit(np.array(state),
+        logp_history = self.logp_model.fit(state,
                             discounted_delta,
                             batch_size=1,
                             epochs=1,
                             verbose=verbose)
+        
+        if done:
+            self.actor_losses.append(logp_history.history['loss'])
 
         # in A2C, target = (discounted_reward)
         discounted_delta = discounted_reward
         discounted_delta = np.reshape(discounted_delta, [-1, 1])
         # train the value network (critic)
-        self.critic.fit(np.array(state),
+        critic_history = self.critic.fit(state,
                                 discounted_delta,
                                 batch_size=1,
                                 epochs=1,
                                 verbose=verbose)
+        if done:
+            self.critic_losses.append(critic_history.history['loss'])
 
 
     # train by episode (REINFORCE, REINFORCE with baseline

@@ -1,6 +1,6 @@
 import gym, os
 from advantage_actor_critic import Agent
-from utils import plotLearning
+from utils import plotLearning, plotLosses
 from gym import wrappers
 from collections import deque
 import numpy as np
@@ -23,16 +23,17 @@ if __name__ == '__main__':
     agent = Agent(n_actions=n_actions, 
         input_dims = state_dimension, 
         stack_size = stack_size, 
-        actor_lr=0.00001, 
-        critic_lr=0.00005, 
+        actor_lr=0.00009, 
+        critic_lr=0.00009, 
         discount_factor = 0.99, 
         entropy_coefficient=0.01, 
+
         state = env.reset()[np.newaxis, :],
         # env_name = env_name
     )
 
     score_history = agent.score_history
-    num_episodes = 5000
+    num_episodes = 2000
 
     while len(agent.score_history) < num_episodes:
         done = False
@@ -77,4 +78,6 @@ if __name__ == '__main__':
 
     env.close()
     plotLearning(score_history, filename=env_name, window=100)
+    plotLosses(agent.actor_losses, filename=env_name + '_actor_losses', window=100)
+    plotLosses(agent.critic_losses, filename=env_name + '_critic_losses', window=100)
 

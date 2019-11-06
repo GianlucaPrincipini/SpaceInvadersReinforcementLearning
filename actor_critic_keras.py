@@ -87,10 +87,6 @@ class Agent(object):
         state = stacked_observation[np.newaxis, :]
         probabilities = self.policy.predict(state)[0] 
         action = np.random.choice(self.action_space, p=probabilities)
-
-        # print(probabilities)
-        #Il clipping delle probabilità evita il logaritmo -inf
-        self.entropy = - (tf.math.reduce_sum(probabilities * tf.math.log(tf.clip_by_value(probabilities,1e-8,1.0 - 1e-8))))
         return action
 
     def learn(self, current_stacked_state, action, reward, state_, done):

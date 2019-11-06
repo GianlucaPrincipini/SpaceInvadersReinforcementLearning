@@ -12,3 +12,17 @@ def plotLearning(scores, filename, x=None, window=5):
     plt.xlabel('Game')                     
     plt.plot(x, running_avg)
     plt.savefig(filename)
+    plt.clf()
+
+def plotLosses(losses, filename, x=None, window=5):
+    N = len(losses)
+    running_avg = np.empty(N)
+    for t in range(N):
+	    running_avg[t] = np.mean(losses[max(0, t-window):(t+1)])
+    if x is None:
+        x = [i for i in range(N)]
+    plt.ylabel('Loss')       
+    plt.xlabel('Episode')                     
+    plt.plot(x, running_avg)
+    plt.savefig(filename)
+    plt.clf()
