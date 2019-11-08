@@ -22,7 +22,6 @@ class Agent(object):
     def __init__(self, actor_lr, critic_lr, stack_size = 1, discount_factor=0.99, n_actions=4,
                  layer1_size=1024, layer2_size=512, input_dims=8, entropy_coefficient = 0.01, state = None, env_name = ''):
         
-        # s,a,r,s' are stored in memory
         self.memory = []
         self.state = state
         self.actor_losses = []
@@ -43,27 +42,27 @@ class Agent(object):
     def reset_memory(self):
         self.memory = []
 
-    # remember every s,a,r,s' in every step of the episode
+    # Salvo in memoria l'item (step, stato, nuovo stato, reward, done)
     def remember(self, item):
         self.memory.append(item)
 
+    # Fornisce l'entropia, le probabilità vengono clippate perché è un logaritmo e il risultato può essere NaN
     def entropy(self, probabilities):
         dist = tfp.distributions.Categorical(probs=probabilities)
         probabilities = tf.clip_by_value(probabilities,1e-5,1.0 - 1e-5)
         entropy = dist.entropy()
         return entropy[0]
 
+    # Restituisce un sample dalla distribuzione categorica
     def action(self, probabilities):
         dist = tfp.distributions.Categorical(probs=probabilities)
         action = dist.sample()
         return action
 
-    # given probs and action compute
+    # Logaritmo della probabilità dell'azione
     def logp(self, args):
         probabilities, action = args
         probabilities = tf.clip_by_value(probabilities,1e-5,1.0 - 1e-5)
-        # probabilities = K.print_tensor(probabilities)
-        # action = K.print_tensor(action)
         dist = tfp.distributions.Categorical(probs = probabilities)
         logp = dist.log_prob(action)
         return logp
@@ -77,7 +76,7 @@ class Agent(object):
         value = self.critic.predict(state)
         return value[0]
 
-    # return the entropy of the policy distribution
+    # Entropia della distribuzione delle azioni
     def get_entropy(self, state):
         entropy = self.entropy_model.predict(state)
         return entropy[0]
@@ -99,12 +98,11 @@ class Agent(object):
         conv1 = Conv2D(64, kernel_size=(4, 4), strides=2, activation='relu')(head)
         conv2 = Conv2D(64, kernel_size=(3, 3), strides=2, activation='relu')(conv1)
         input_tail_network = Flatten()(conv2)
-        # input_tail_network = Input(shape=self.input_dims)
-        # input = input_tail_network
         
         ### ACTOR ###
         dense_actor_1 =     Dense(self.fc1_dims, activation='relu', kernel_initializer=glorot_normal())(input_tail_network)
-        probs = Dense(self.n_actions, activation='softmax')(dense_actor_1)
+        dense_actor_2 =    Dense(self.fc2_dims, activation='relu', kernel_initializer=glorot_normal())(dense_actor_1)
+        probs = Dense(self.n_actions, activation='softmax')(dense_actor_2)
         action_layer = Lambda(self.action, output_shape=(1,), name='action')(probs)
         self.actor = Model(input, action_layer)
         plot_model(self.actor, to_file='actor.png', show_shapes=True)
@@ -128,7 +126,8 @@ class Agent(object):
 
         ### CRITIC ###
         dense_critic_1 =    Dense(self.fc1_dims, activation='relu', kernel_initializer=glorot_normal())(input_tail_network)
-        values = Dense(1, activation='linear', kernel_initializer='zero')(dense_critic_1)
+        dense_critic_2 =    Dense(self.fc2_dims, activation='relu', kernel_initializer=glorot_normal())(dense_critic_1)
+        values = Dense(1, activation='linear', kernel_initializer='zero')(dense_critic_2)
         self.critic = Model(input, values)
         self.critic.compile(optimizer=Adam(lr=self.critic_lr), loss='mean_squared_error')
         plot_model(self.critic, to_file='critic.png', show_shapes=True)
@@ -138,21 +137,19 @@ class Agent(object):
             self.critic.load_weights(env_name + '_critic.h5')
             with open (env_name + '_scores.dat', 'rb') as fp:
                 self.score_history = pickle.load(fp)
-            with open(envName + '_actor_losses.dat', 'rb') as fp:
+            with open(env_name + '_actor_losses.dat', 'rb') as fp:
                 self.actor_losses = pickle.load(fp)
-            with open(envName + '_critic_losses.dat', 'rb') as fp:
+            with open(env_name + '_critic_losses.dat', 'rb') as fp:
                 self.critic_losses = pickle.load(fp) 
 
 
         return 
 
 
-    # main routine for training as used by all 4 policy gradient
-    # methods
     def train(self, item, gamma=1.0):
         [step, state, next_state, discounted_reward, done] = item
 
-        # must save state for entropy computation
+        # Salvo lo stato per calcolare l'entropia
         self.state = state
 
         discount_factor = gamma**step
@@ -161,18 +158,15 @@ class Agent(object):
         # a2c: delta = discounted_reward - value
         val = self.get_value(state)[0]
         delta = discounted_reward - val
-        # apply the discount factor as shown in Algortihms
-        # 10.2.1, 10.3.1 and 10.4.1
+        
+        # Applico il fattore di discount
         discounted_delta = delta * discount_factor
         discounted_delta = np.reshape(discounted_delta, [-1, 1])
         # verbose = 1 if done else 0
         verbose = 0
 
-        # print(state.shape)
 
-        # train the logp model (implies training of actor model
-        # as well) since they share exactly the same set of
-        # # parameters
+        # Addestrare il logp_model implica addestrare anche il modello con le probabilità
         logp_history = self.logp_model.fit(state,
                             discounted_delta,
                             batch_size=1,
@@ -185,7 +179,7 @@ class Agent(object):
         # in A2C, target = (discounted_reward)
         discounted_delta = discounted_reward
         discounted_delta = np.reshape(discounted_delta, [-1, 1])
-        # train the value network (critic)
+        
         critic_history = self.critic.fit(state,
                                 discounted_delta,
                                 batch_size=1,
@@ -195,25 +189,16 @@ class Agent(object):
             self.critic_losses.append(critic_history.history['loss'])
 
 
-    # train by episode (REINFORCE, REINFORCE with baseline
-    # and A2C use this routine to prepare the dataset before
-    # the step by step training)
     def train_by_episode(self, last_value=0):
-        # implements A2C training from the last state
-        # to the first state
-        # discount factor
         gamma = self.discount_factor
         r = last_value
-        # the memory is visited in reverse as shown
-        # in Algorithm 10.5.1
+
+        # La memoria viene elaborata dalla fine
         for item in self.memory[::-1]:
             [step, state, next_state, reward, done] = item
-            # compute the return
+            # calcola il ritorno (discounted reward)
             r = reward + gamma*r
-            # print(step, r)
             item = [step, state, next_state, r, done]
-            # train per step
-            # reward has been discounted
             self.train(item, self.discount_factor)
 
         return

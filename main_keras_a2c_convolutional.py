@@ -10,12 +10,10 @@ import atari_wrappers as aw
 
 env_name = 'Breakout-v4'
 
-stack_size = 4
+stack_size = 3
 
 if __name__ == '__main__':
-    env = aw.FrameStack(aw.FireResetEnv(gym.make(env_name)), stack_size)
-    # env_name = 'CartPole-v0'
-    # env = gym.make(env_name)
+    env = aw.FrameStack(aw.TimeLimit(aw.FireResetEnv(gym.make(env_name)), 2000), stack_size)
     state_dimension = env.observation_space.shape
     #setto come dimensione quella del reshape
     n_actions = env.action_space.n
@@ -23,10 +21,10 @@ if __name__ == '__main__':
     agent = Agent(n_actions=n_actions, 
         input_dims = state_dimension, 
         stack_size = stack_size, 
-        actor_lr=0.00009, 
-        critic_lr=0.00009, 
+        actor_lr=0.0005, 
+        critic_lr=0.005 , 
         discount_factor = 0.99, 
-        entropy_coefficient=0.01, 
+        entropy_coefficient=0.02, 
         state = env.reset()[np.newaxis, :],
         # env_name = env_name
     )
@@ -56,10 +54,7 @@ if __name__ == '__main__':
             observation = observation_
             
             if done:
-                # for REINFORCE, REINFORCE with baseline, and A2C
-                # we wait for the completion of the episode before 
-                # training the network(s)
-                # last value as used by A2C
+                # L'addestramento avviene alla fine di ogni episodio
                 v = 0 if reward > 0 else agent.get_value(observation_)[0]
                 agent.train_by_episode(last_value=v)
 
