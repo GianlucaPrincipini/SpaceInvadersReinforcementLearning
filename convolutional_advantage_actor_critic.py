@@ -20,9 +20,10 @@ from keras.utils import plot_model
 
 class Agent(object):
     def __init__(self, actor_lr, critic_lr, stack_size = 1, discount_factor=0.99, n_actions=4,
-                 layer1_size=1024, layer2_size=512, input_dims=8, entropy_coefficient = 0.01, state = None, env_name = ''):
+                 layer1_size=1024, layer2_size=512, input_dims=8, entropy_coefficient = 0.01, state = None, n_env = 1, env_name = ''):
         
-        self.memory = []
+        self.n_env = n_env
+        self.reset_memory()
         self.state = state
         self.actor_losses = []
         self.critic_losses = []
@@ -41,10 +42,13 @@ class Agent(object):
 
     def reset_memory(self):
         self.memory = []
+        for i in range(self.n_env):
+            self.memory.append([])
+
 
     # Salvo in memoria l'item (step, stato, nuovo stato, reward, done)
-    def remember(self, item):
-        self.memory.append(item)
+    def remember(self, memory_index, item):
+        self.memory[memory_index].append(item)
 
     # Fornisce l'entropia, le probabilità vengono clippate perché è un logaritmo e il risultato può essere NaN
     def entropy(self, probabilities):
@@ -62,6 +66,7 @@ class Agent(object):
     # Logaritmo della probabilità dell'azione
     def logp(self, args):
         probabilities, action = args
+        # probabilities = K.print_tensor(probabilities)
         probabilities = tf.clip_by_value(probabilities,1e-5,1.0 - 1e-5)
         dist = tfp.distributions.Categorical(probs = probabilities)
         logp = dist.log_prob(action)
@@ -189,17 +194,18 @@ class Agent(object):
             self.critic_losses.append(critic_history.history['loss'])
 
 
-    def train_by_episode(self, last_value=0):
+    def train_by_episode(self, last_value):
         gamma = self.discount_factor
-        r = last_value
 
         # La memoria viene elaborata dalla fine
-        for item in self.memory[::-1]:
-            [step, state, next_state, reward, done] = item
-            # calcola il ritorno (discounted reward)
-            r = reward + gamma*r
-            item = [step, state, next_state, r, done]
-            self.train(item, self.discount_factor)
+        for i in range(self.n_env):
+            r = last_value[i]
+            for item in self.memory[i][::-1]:
+                [step, state, next_state, reward, done] = item
+                # calcola il ritorno (discounted reward)
+                r = reward + gamma*r
+                item = [step, state, next_state, r, done]
+                self.train(item, self.discount_factor)
 
         return
 
