@@ -19,8 +19,20 @@ from keras.utils import plot_model
 
 
 class Agent(object):
-    def __init__(self, actor_lr, critic_lr, stack_size = 1, discount_factor=0.99, n_actions=4,
-                 layer1_size=1024, layer2_size=512, input_dims=8, entropy_coefficient = 0.01, state = None, n_env = 1, env_name = ''):
+    def __init__(self, 
+            actor_lr, 
+            critic_lr, 
+            stack_size = 1, 
+            discount_factor=0.99, 
+            n_actions=4,
+            layer1_size=512, 
+            layer2_size=512, 
+            input_dims=8, 
+            entropy_coefficient = 0.01, 
+            state = None, 
+            n_env = 1, 
+            env_name = ''
+        ):
         
         self.n_env = n_env
         self.reset_memory()
@@ -87,12 +99,10 @@ class Agent(object):
         return entropy[0]
 
 
-    # logp loss, the 3rd and 4th variables (entropy and beta) are needed
-    # by A2C so we have a different loss function structure
+
     def custom_loss(self, entropy, entropy_coefficient=0.0):
         def loss(y_true, y_pred):
             return -K.mean((y_pred * y_true) + (entropy_coefficient * entropy), axis=-1)
-
         return loss
 
 
@@ -106,8 +116,8 @@ class Agent(object):
         
         ### ACTOR ###
         dense_actor_1 =     Dense(self.fc1_dims, activation='relu', kernel_initializer=glorot_normal())(input_tail_network)
-        dense_actor_2 =    Dense(self.fc2_dims, activation='relu', kernel_initializer=glorot_normal())(dense_actor_1)
-        probs = Dense(self.n_actions, activation='softmax')(dense_actor_2)
+        # dense_actor_2 =    Dense(self.fc2_dims, activation='relu', kernel_initializer=glorot_normal())(dense_actor_1)
+        probs = Dense(self.n_actions, activation='softmax')(dense_actor_1)
         action_layer = Lambda(self.action, output_shape=(1,), name='action')(probs)
         self.actor = Model(input, action_layer)
         plot_model(self.actor, to_file='actor.png', show_shapes=True)
@@ -131,8 +141,8 @@ class Agent(object):
 
         ### CRITIC ###
         dense_critic_1 =    Dense(self.fc1_dims, activation='relu', kernel_initializer=glorot_normal())(input_tail_network)
-        dense_critic_2 =    Dense(self.fc2_dims, activation='relu', kernel_initializer=glorot_normal())(dense_critic_1)
-        values = Dense(1, activation='linear', kernel_initializer='zero')(dense_critic_2)
+        # dense_critic_2 =    Dense(self.fc2_dims, activation='relu', kernel_initializer=glorot_normal())(dense_critic_1)
+        values = Dense(1, activation='linear', kernel_initializer='zero')(dense_critic_1)
         self.critic = Model(input, values)
         self.critic.compile(optimizer=Adam(lr=self.critic_lr), loss='mean_squared_error')
         plot_model(self.critic, to_file='critic.png', show_shapes=True)
@@ -153,38 +163,29 @@ class Agent(object):
 
     def train(self, item, gamma=1.0):
         [step, state, next_state, discounted_reward, done] = item
-
         # Salvo lo stato per calcolare l'entropia
         self.state = state
-
         discount_factor = gamma**step
-
-
         # a2c: delta = discounted_reward - value
         val = self.get_value(state)[0]
         delta = discounted_reward - val
-        
         # Applico il fattore di discount
         discounted_delta = delta * discount_factor
         discounted_delta = np.reshape(discounted_delta, [-1, 1])
         # verbose = 1 if done else 0
         verbose = 0
-
-
         # Addestrare il logp_model implica addestrare anche il modello con le probabilità
         logp_history = self.logp_model.fit(state,
                             discounted_delta,
                             batch_size=1,
                             epochs=1,
                             verbose=verbose)
-        
         if done:
             self.actor_losses.append(logp_history.history['loss'])
 
         # in A2C, target = (discounted_reward)
         discounted_delta = discounted_reward
         discounted_delta = np.reshape(discounted_delta, [-1, 1])
-        
         critic_history = self.critic.fit(state,
                                 discounted_delta,
                                 batch_size=1,

@@ -10,8 +10,6 @@ import atari_wrappers as aw
 
 env_name = 'SpaceInvaders-v4'
 
-stack_size = 8
-
 if __name__ == '__main__':
     # env = aw.FrameStack(aw.NoopResetEnv(aw.ClipRewardEnv(gym.make(env_name)), 35), stack_size)
     env_name = 'CartPole-v0'
@@ -20,20 +18,18 @@ if __name__ == '__main__':
     #setto come dimensione quella del reshape
     n_actions = env.action_space.n
 
-    agent = Agent(n_actions=n_actions, 
-        input_dims = state_dimension, 
-        stack_size = stack_size, 
-        actor_lr=0.00009, 
-        critic_lr=0.00009, 
+    agent = Agent(
+        n_actions=env.action_space.n, 
+        input_dims = env.observation_space.shape, 
+        actor_lr=0.00008, 
+        critic_lr=0.00008, 
         discount_factor = 0.99, 
         entropy_coefficient=0.01, 
-
         state = env.reset()[np.newaxis, :],
-        # env_name = env_name
     )
 
     score_history = agent.score_history
-    num_episodes = 2000
+    num_episodes = 0
 
     while len(agent.score_history) < num_episodes:
         done = False
@@ -41,15 +37,12 @@ if __name__ == '__main__':
         observation = env.reset()
         observation = observation[np.newaxis, :]
         agent.reset_memory()
-        #"banale" loop di interazione con gym
         step_number = 0
         while not done:
-            agent.choose_action(observation)
             env.render()
             action = agent.choose_action(observation)
             observation_, reward, done, info = env.step(action)
             observation_ = observation_[np.newaxis, :]
-
             step = [step_number, observation, observation_, reward, done]
             agent.remember(step)
             step_number = step_number + 1
@@ -57,11 +50,8 @@ if __name__ == '__main__':
             observation = observation_
             
             if done:
-                # for REINFORCE, REINFORCE with baseline, and A2C
-                # we wait for the completion of the episode before 
-                # training the network(s)
-                # last value as used by A2C
-                v = 0 if reward > 0 else agent.get_value(observation_)[0]
+                # L'addestramento avviene alla fine di ogni episodio
+                v = agent.get_value(observation_)[0]
                 agent.train_by_episode(last_value=v)
 
             

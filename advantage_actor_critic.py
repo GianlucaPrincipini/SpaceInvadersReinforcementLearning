@@ -62,8 +62,6 @@ class Agent(object):
     def logp(self, args):
         probabilities, action = args
         probabilities = tf.clip_by_value(probabilities,1e-5,1.0 - 1e-5)
-        # probabilities = K.print_tensor(probabilities)
-        # action = K.print_tensor(action)
         dist = tfp.distributions.Categorical(probs = probabilities)
         logp = dist.log_prob(action)
         return logp
@@ -94,35 +92,29 @@ class Agent(object):
 
     def build_actor_critic_network(self, env_name):
         #creazione della struttura delle nostre due reti
-        # input = Input(shape=(93, 84, self.stack_size))
-        # head =  Conv2D(32, kernel_size=(8, 8), strides=2, activation='relu', kernel_initializer=glorot_normal())(input)
-        # conv1 = Conv2D(64, kernel_size=(4, 4), strides=2, activation='relu', kernel_initializer=glorot_normal())(head)
-        # conv2 = Conv2D(64, kernel_size=(3, 3), strides=2, activation='relu', kernel_initializer=glorot_normal())(conv1)
-        # input_tail_network = Flatten()(conv2)
         input_tail_network = Input(shape=self.input_dims)
-        input = input_tail_network
         
         ### ACTOR ###
         dense_actor_1 =     Dense(self.fc1_dims, activation='relu', kernel_initializer=glorot_normal())(input_tail_network)
         dense_actor_2 =     Dense(self.fc2_dims, activation='relu', kernel_initializer=glorot_normal())(dense_actor_1)
         probs = Dense(self.n_actions, activation='softmax')(dense_actor_2)
         action_layer = Lambda(self.action, output_shape=(1,), name='action')(probs)
-        self.actor = Model(input, action_layer)
-        plot_model(self.actor, to_file='actor.png', show_shapes=True)
+        self.actor = Model(input_tail_network, action_layer)
+        plot_model(self.actor, to_file='actor_normal.png', show_shapes=True)
 
         logp = Lambda(self.logp,
                 output_shape=(1,),
                 name='logp')([probs, action_layer])
 
-        self.logp_model = Model(input, logp)
-        plot_model(self.logp_model, to_file='logp.png', show_shapes=True)
+        self.logp_model = Model(input_tail_network, logp)
+        plot_model(self.logp_model, to_file='logp_normal.png', show_shapes=True)
 
         ### ENTROPIA ###
         entropy = Lambda(self.entropy,
                     output_shape=(1,),
                     name='entropy')(probs)
-        self.entropy_model = Model(input, entropy)
-        plot_model(self.entropy_model, to_file='entropy_model.png', show_shapes=True)
+        self.entropy_model = Model(input_tail_network, entropy)
+        plot_model(self.entropy_model, to_file='entropy_model_normal.png', show_shapes=True)
 
         loss = self.custom_loss(self.get_entropy(self.state), self.entropy_coefficient)
         self.logp_model.compile(optimizer=RMSprop(lr=self.actor_lr), loss=loss)
@@ -131,9 +123,9 @@ class Agent(object):
         dense_critic_1 =    Dense(self.fc1_dims, activation='relu', kernel_initializer=glorot_normal())(input_tail_network)
         dense_critic_2 =     Dense(self.fc2_dims, activation='relu', kernel_initializer=glorot_normal())(dense_critic_1)
         values = Dense(1, activation='linear', kernel_initializer='zero')(dense_critic_2)
-        self.critic = Model(input, values)
+        self.critic = Model(input_tail_network, values)
         self.critic.compile(optimizer=Adam(lr=self.critic_lr), loss='mean_squared_error')
-        plot_model(self.critic, to_file='critic.png', show_shapes=True)
+        plot_model(self.critic, to_file='critic_normal.png', show_shapes=True)
 
         if (env_name != ''):
             self.logp_model.load_weights(env_name + '_actor.h5')        
@@ -145,12 +137,11 @@ class Agent(object):
         return 
 
 
-    # main routine for training as used by all 4 policy gradient
-    # methods
+
     def train(self, item, gamma=1.0):
         [step, state, next_state, discounted_reward, done] = item
 
-        # must save state for entropy computation
+        # Salvo lo stato per calcolare l'entropia
         self.state = state
 
         discount_factor = gamma**step
@@ -193,27 +184,17 @@ class Agent(object):
             self.critic_losses.append(critic_history.history['loss'])
 
 
-    # train by episode (REINFORCE, REINFORCE with baseline
-    # and A2C use this routine to prepare the dataset before
-    # the step by step training)
+
     def train_by_episode(self, last_value=0):
-        # implements A2C training from the last state
-        # to the first state
-        # discount factor
         gamma = self.discount_factor
         r = last_value
-        # the memory is visited in reverse as shown
-        # in Algorithm 10.5.1
+        # La memoria viene elaborata dalla fine
         for item in self.memory[::-1]:
             [step, state, next_state, reward, done] = item
-            # compute the return
+            # calcola il ritorno (discounted reward)
             r = reward + gamma*r
-            # print(step, r)
             item = [step, state, next_state, r, done]
-            # train per step
-            # reward has been discounted
             self.train(item, self.discount_factor)
-
         return
 
 

@@ -9,12 +9,12 @@ import atari_wrappers as aw
 from time import sleep
 
 
-env_name = 'BreakoutNoFrameskip-v4'
-n_env = 16
+env_name = 'SpaceInvaders-v4'
+n_env = 8
 stack_size = 4
 
 if __name__ == '__main__':
-    env = aw.FrameStack(aw.TimeLimit(aw.FireResetEnv(gym.make(env_name)), 5000), stack_size)
+    env = aw.FrameStack(aw.NoopResetEnv(aw.ClipRewardEnv(gym.make(env_name)), 35), stack_size)
     state_dimension = env.observation_space.shape
     #setto come dimensione quella del reshape
     n_actions = env.action_space.n
@@ -22,17 +22,17 @@ if __name__ == '__main__':
     agent = Agent(n_actions=n_actions, 
         input_dims = state_dimension, 
         stack_size = stack_size, 
-        actor_lr=0.0007, 
-        critic_lr=0.0007, 
+        actor_lr=0.0003, 
+        critic_lr=0.0003, 
         discount_factor = 0.9, 
-        entropy_coefficient=0.01, 
+        entropy_coefficient=0.02, 
         state = env.reset()[np.newaxis, :],
         n_env=n_env,
         env_name = env_name
     )
 
     score_history = agent.score_history
-    num_episodes = 20000
+    num_episodes = 12000
 
     while len(agent.score_history) < num_episodes:
         #"banale" loop di interazione con gym
@@ -46,7 +46,6 @@ if __name__ == '__main__':
             observation = env.reset()
             observation = observation[np.newaxis, :]
             while not done:
-                agent.choose_action(observation)
                 env.render()
                 action = agent.choose_action(observation)
                 # sleep(1)
@@ -59,7 +58,7 @@ if __name__ == '__main__':
                 observation = observation_
                 if done:
                     i = i + 1
-                    last_value.append(0 if reward > 0 else agent.get_value(observation_)[0])
+                    last_value.append(agent.get_value(observation_)[0])
                     agent.score_history.append(score)
                     print('episode: ', len(agent.score_history),'score: %.2f' % score)
 
