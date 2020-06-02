@@ -7,9 +7,6 @@ import numpy as np
 import cv2
 import atari_wrappers as aw
 
-
-env_name = 'SpaceInvaders-v4'
-
 if __name__ == '__main__':
     # env = aw.FrameStack(aw.NoopResetEnv(aw.ClipRewardEnv(gym.make(env_name)), 35), stack_size)
     env_name = 'CartPole-v0'
@@ -21,15 +18,15 @@ if __name__ == '__main__':
     agent = Agent(
         n_actions=env.action_space.n, 
         input_dims = env.observation_space.shape, 
-        actor_lr=0.00008, 
-        critic_lr=0.00008, 
+        actor_lr=0.00009, 
+        critic_lr=0.00009, 
         discount_factor = 0.99, 
         entropy_coefficient=0.01, 
         state = env.reset()[np.newaxis, :],
     )
 
     score_history = agent.score_history
-    num_episodes = 10000
+    num_episodes = 2000
 
     while len(agent.score_history) < num_episodes:
         done = False
@@ -51,7 +48,9 @@ if __name__ == '__main__':
             
             if done:
                 # L'addestramento avviene alla fine di ogni episodio
-                v = agent.get_value(observation_)[0]
+                v = 0 if reward > 0 else agent.get_value(observation_)[0]
+
+#                v = agent.get_value(observation_)[0]
                 agent.train_by_episode(last_value=v)
 
             

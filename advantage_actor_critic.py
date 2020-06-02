@@ -14,7 +14,7 @@ from math import log
 import cv2
 from collections import deque
 import matplotlib.pyplot as plt
-from keras.utils import # plot_model
+from keras.utils import plot_model
 
 
 
