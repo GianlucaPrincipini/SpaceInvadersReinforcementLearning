@@ -29,7 +29,7 @@ if __name__ == '__main__':
     )
 
     score_history = agent.score_history
-    num_episodes = 0
+    num_episodes = 10000
 
     while len(agent.score_history) < num_episodes:
         done = False

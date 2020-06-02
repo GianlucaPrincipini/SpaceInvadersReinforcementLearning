@@ -120,21 +120,21 @@ class Agent(object):
         probs = Dense(self.n_actions, activation='softmax')(dense_actor_1)
         action_layer = Lambda(self.action, output_shape=(1,), name='action')(probs)
         self.actor = Model(input, action_layer)
-        plot_model(self.actor, to_file='actor.png', show_shapes=True)
+        # plot_model(self.actor, to_file='actor.png', show_shapes=True)
 
         logp = Lambda(self.logp,
                 output_shape=(1,),
                 name='logp')([probs, action_layer])
 
         self.logp_model = Model(input, logp)
-        plot_model(self.logp_model, to_file='logp.png', show_shapes=True)
+        # plot_model(self.logp_model, to_file='logp.png', show_shapes=True)
 
         ### ENTROPIA ###
         entropy = Lambda(self.entropy,
                     output_shape=(1,),
                     name='entropy')(probs)
         self.entropy_model = Model(input, entropy)
-        plot_model(self.entropy_model, to_file='entropy_model.png', show_shapes=True)
+        # plot_model(self.entropy_model, to_file='entropy_model.png', show_shapes=True)
 
         loss = self.custom_loss(self.get_entropy(self.state), self.entropy_coefficient)
         self.logp_model.compile(optimizer=RMSprop(lr=self.actor_lr), loss=loss)
@@ -145,7 +145,7 @@ class Agent(object):
         values = Dense(1, activation='linear', kernel_initializer='zero')(dense_critic_1)
         self.critic = Model(input, values)
         self.critic.compile(optimizer=Adam(lr=self.critic_lr), loss='mean_squared_error')
-        plot_model(self.critic, to_file='critic.png', show_shapes=True)
+        # plot_model(self.critic, to_file='critic.png', show_shapes=True)
 
         if (env_name != ''):
             self.logp_model.load_weights(env_name + '_actor.h5')        

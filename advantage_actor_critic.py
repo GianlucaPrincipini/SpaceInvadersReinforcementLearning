@@ -14,7 +14,7 @@ from math import log
 import cv2
 from collections import deque
 import matplotlib.pyplot as plt
-from keras.utils import plot_model
+from keras.utils import # plot_model
 
 
 
@@ -100,21 +100,21 @@ class Agent(object):
         probs = Dense(self.n_actions, activation='softmax')(dense_actor_2)
         action_layer = Lambda(self.action, output_shape=(1,), name='action')(probs)
         self.actor = Model(input_tail_network, action_layer)
-        plot_model(self.actor, to_file='actor_normal.png', show_shapes=True)
+        # plot_model(self.actor, to_file='actor_normal.png', show_shapes=True)
 
         logp = Lambda(self.logp,
                 output_shape=(1,),
                 name='logp')([probs, action_layer])
 
         self.logp_model = Model(input_tail_network, logp)
-        plot_model(self.logp_model, to_file='logp_normal.png', show_shapes=True)
+        # plot_model(self.logp_model, to_file='logp_normal.png', show_shapes=True)
 
         ### ENTROPIA ###
         entropy = Lambda(self.entropy,
                     output_shape=(1,),
                     name='entropy')(probs)
         self.entropy_model = Model(input_tail_network, entropy)
-        plot_model(self.entropy_model, to_file='entropy_model_normal.png', show_shapes=True)
+        # plot_model(self.entropy_model, to_file='entropy_model_normal.png', show_shapes=True)
 
         loss = self.custom_loss(self.get_entropy(self.state), self.entropy_coefficient)
         self.logp_model.compile(optimizer=RMSprop(lr=self.actor_lr), loss=loss)
@@ -125,7 +125,7 @@ class Agent(object):
         values = Dense(1, activation='linear', kernel_initializer='zero')(dense_critic_2)
         self.critic = Model(input_tail_network, values)
         self.critic.compile(optimizer=Adam(lr=self.critic_lr), loss='mean_squared_error')
-        plot_model(self.critic, to_file='critic_normal.png', show_shapes=True)
+        # plot_model(self.critic, to_file='critic_normal.png', show_shapes=True)
 
         if (env_name != ''):
             self.logp_model.load_weights(env_name + '_actor.h5')        

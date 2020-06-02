@@ -7,6 +7,7 @@ from gym import spaces
 import cv2
 cv2.ocl.setUseOpenCL(False)
 from wrappers import TimeLimit
+import matplotlib.pyplot as plt
 
 
 class NoopResetEnv(gym.Wrapper):
@@ -163,6 +164,8 @@ class FrameStack(gym.Wrapper):
     def step(self, action):
         ob, reward, done, info = self.env.step(action)
         self.frames.append(self.preprocess(ob))
+        # plt.imshow(np.squeeze(np.asarray(list(self.frames))).reshape(93, 84, 4))
+        # plt.show()
         return self._get_ob(), reward, done, info
 
     def _get_ob(self):

@@ -9,8 +9,8 @@ import atari_wrappers as aw
 from time import sleep
 
 
-env_name = 'SpaceInvaders-v4'
-n_env = 8
+env_name = 'SpaceInvaders-v0'
+n_env = 4
 stack_size = 4
 
 if __name__ == '__main__':
@@ -22,18 +22,19 @@ if __name__ == '__main__':
     agent = Agent(n_actions=n_actions, 
         input_dims = state_dimension, 
         stack_size = stack_size, 
-        actor_lr=0.0003, 
-        critic_lr=0.0003, 
+        actor_lr=0.00003, 
+        critic_lr=0.00003, 
         discount_factor = 0.9, 
         entropy_coefficient=0.02, 
         state = env.reset()[np.newaxis, :],
         n_env=n_env,
-        env_name = env_name
+        # env_name = env_name
     )
 
     score_history = agent.score_history
     num_episodes = 12000
 
+    
     while len(agent.score_history) < num_episodes:
         #"banale" loop di interazione con gym
         i = 0
