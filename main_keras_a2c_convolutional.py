@@ -14,7 +14,7 @@ n_env = 4
 stack_size = 4
 
 if __name__ == '__main__':
-    env = aw.FrameStack(aw.NoopResetEnv(aw.ClipRewardEnv(gym.make(env_name)), 35), stack_size)
+    env = aw.FrameStack(aw.NoopResetEnv(gym.make(env_name), 35), stack_size)
     state_dimension = env.observation_space.shape
     #setto come dimensione quella del reshape
     n_actions = env.action_space.n
@@ -32,10 +32,10 @@ if __name__ == '__main__':
     )
 
     score_history = agent.score_history
-    num_episodes = 12000
+    num_episodes = 10000
 
     
-    while len(agent.score_history) < num_episodes:
+    while len(agent.score_history) < num_episodes * n_env:
         #"banale" loop di interazione con gym
         i = 0
         last_value = []
@@ -59,7 +59,7 @@ if __name__ == '__main__':
                 observation = observation_
                 if done:
                     i = i + 1
-                    last_value.append(agent.get_value(observation_)[0])
+                    last_value.append(0 if reward > 0 else agent.get_value(observation_)[0])
                     agent.score_history.append(score)
                     print('episode: ', len(agent.score_history),'score: %.2f' % score)
 
