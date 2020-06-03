@@ -1,8 +1,8 @@
 # SpaceInvadersReinforcementLearning
 ## Requirements
-Requires Python 3.7
+Python 3.7
 
-Install requirements by running 
+Install pip requirements by running 
   * pip install-r requirements.txt
 
 ## Run
