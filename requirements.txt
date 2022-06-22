@@ -34,7 +34,7 @@ mkl-fft==1.0.14
 mkl-random==1.1.0
 mkl-service==2.3.0
 networkx==2.4
-numpy==1.16.5
+numpy==1.22.0
 opencv-python==4.1.1.26
 opt-einsum==3.1.0
 pandas==1.0.4
